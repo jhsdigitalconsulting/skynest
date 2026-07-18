@@ -1,0 +1,184 @@
+import { NextRequest, NextResponse, after } from 'next/server';
+import { timingSafeEqual } from 'crypto';
+import {
+  publishDocument,
+  serializeDocument,
+} from '@promptowl/contextnest-engine';
+import { createEngine } from '@/lib/vault/index';
+import { verifyReadAiSignature } from '@/lib/webhooks/readai/verify';
+import { ReadAiPayloadSchema } from '@/lib/webhooks/readai/schema';
+import { isDuplicate } from '@/lib/webhooks/readai/dedup';
+import { analyzeMeeting } from '@/lib/webhooks/readai/analyze';
+import { buildMeetingDocument } from '@/lib/webhooks/readai/document';
+import { fromReadAiPayload } from '@/lib/webhooks/readai/input';
+
+export const maxDuration = 60;
+
+const VAULT_ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+
+interface RouteContext {
+  params: Promise<{ apikey: string; vaultId: string }>;
+}
+
+const KNOWLEDGE_PATHS = {
+  registry: 'nodes/clients/harvest-client-project-context',
+  topicVocab: 'nodes/processes/meeting-topic-vocabulary',
+  examples: 'nodes/processes/meeting-tagging-examples',
+} as const;
+
+async function loadKnowledge(storage: {
+  readDocument: (id: string) => Promise<{ rawContent: string } | null>;
+}): Promise<{ registry: string; topicVocab: string; examples: string }> {
+  const read = async (id: string) => {
+    try {
+      const doc = await storage.readDocument(id);
+      return doc?.rawContent ?? '';
+    } catch {
+      return '';
+    }
+  };
+  const [registry, topicVocab, examples] = await Promise.all([
+    read(KNOWLEDGE_PATHS.registry),
+    read(KNOWLEDGE_PATHS.topicVocab),
+    read(KNOWLEDGE_PATHS.examples),
+  ]);
+  return { registry, topicVocab, examples };
+}
+
+export async function POST(req: NextRequest, { params }: RouteContext) {
+  const { apikey, vaultId: rawVaultId } = await params;
+
+  // Step 1: Path key check (timing-safe)
+  const webhookApiKey = process.env.WEBHOOK_API_KEY ?? '';
+  if (
+    apikey.length !== webhookApiKey.length ||
+    !timingSafeEqual(Buffer.from(apikey), Buffer.from(webhookApiKey))
+  ) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
+  // Step 1a: Vault ID validation
+  const resolvedVaultId =
+    rawVaultId === 'default'
+      ? (process.env.CONTEXTNEST_DEFAULT_VAULT_ID ?? 'default')
+      : rawVaultId;
+  if (!VAULT_ID_RE.test(resolvedVaultId)) {
+    return NextResponse.json({ error: 'invalid vault id' }, { status: 400 });
+  }
+
+  // Step 2: HMAC-SHA256 body verification
+  const rawBody = await req.text();
+  const signature = req.headers.get('x-read-signature') ?? '';
+  const signingKey = process.env.READ_AI_SIGNING_KEY ?? '';
+  if (!verifyReadAiSignature(rawBody, signature, signingKey)) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
+  // Parse payload
+  let jsonBody: unknown;
+  try {
+    jsonBody = JSON.parse(rawBody);
+  } catch {
+    console.error('[skynest] invalid json body (first 500 chars):', rawBody.slice(0, 500));
+    return NextResponse.json({ error: 'invalid json' }, { status: 400 });
+  }
+  console.log('[skynest] raw payload keys:', Object.keys(jsonBody as object));
+  console.log('[skynest] full payload:', JSON.stringify(jsonBody));
+  const parsed = ReadAiPayloadSchema.safeParse(jsonBody);
+  if (!parsed.success) {
+    console.error('[skynest] schema validation failed:', JSON.stringify(parsed.error.issues));
+    return NextResponse.json({ error: 'invalid payload', issues: parsed.error.issues }, { status: 400 });
+  }
+  const payload = parsed.data;
+  console.log('[skynest] readai payload', JSON.stringify(payload, null, 2));
+
+  // Initialize vault engine with bot identity
+  const botToken = process.env.BOT_GITHUB_TOKEN ?? '';
+  console.log(`[skynest] step: createEngine vault=${resolvedVaultId} hasToken=${!!botToken} syncProvider=${process.env.VAULT_SYNC_PROVIDER ?? 'github'} repo=${process.env.VAULT_REPO ?? '(unset)'}`);
+  const { storage, sync } = createEngine(botToken, resolvedVaultId);
+
+  // Step 3: Deduplication
+  console.log(`[skynest] step: dedup check request_id=${payload.request_id}`);
+  if (await isDuplicate(storage, payload.request_id)) {
+    console.log(`[skynest] step: duplicate, skipping`);
+    return NextResponse.json({ ok: true, duplicate: true }, { status: 200 });
+  }
+
+  // Load tagging knowledge (all non-fatal if missing)
+  console.log(`[skynest] step: load knowledge`);
+  const knowledge = await loadKnowledge(storage);
+
+  // Tagger analysis (failure is non-fatal — document is always written)
+  console.log(`[skynest] step: analyze meeting`);
+  const input = fromReadAiPayload(payload);
+  let analysis;
+  try {
+    analysis = await analyzeMeeting(input, knowledge);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[skynest] analyzeMeeting threw (non-fatal): ${msg}`);
+    analysis = {
+      billing_client: { name: 'unknown', slug: 'unknown' },
+      end_client: null, project: null, confidence: 'low' as const,
+      topics_canonical: [], topics_freeform: [], summary: '', action_items: [],
+      tagger_error: true,
+    };
+  }
+  console.log(`[skynest] step: analyze ok tagger_error=${(analysis as { tagger_error?: boolean }).tagger_error ?? false}`);
+
+  // Build document
+  console.log(`[skynest] step: build document`);
+  const { id, frontmatter, body } = buildMeetingDocument(
+    input,
+    analysis,
+    payload.request_id,
+    payload.session_id,
+    payload.report_url,
+  );
+  const node = {
+    id,
+    filePath: '',
+    frontmatter,
+    body: `\n${body}\n`,
+    rawContent: '',
+  };
+  const content = serializeDocument(node);
+  console.log(`[skynest] step: document built id=${id}`);
+
+  // Write to vault — throws on failure → 500 → triggers Read.ai retry
+  try {
+    console.log(`[skynest] step: writeDocument`);
+    await storage.writeDocument(id, content);
+    console.log(`[skynest] step: publishDocument`);
+    await publishDocument(storage, id, {
+      editedBy: 'skynest-bot',
+      note: 'Ingested via Read.ai webhook',
+    });
+    console.log(`[skynest] step: regenerateIndex`);
+    await storage.regenerateIndex();
+    console.log(`[skynest] vault write ok vault=${resolvedVaultId} doc=${id} session=${payload.session_id}`);
+  } catch (err) {
+    const msg = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);
+    console.error(`[skynest] vault write failed vault=${resolvedVaultId} doc=${id}: ${msg}`);
+    return NextResponse.json({ error: 'vault write failed' }, { status: 500 });
+  }
+
+  // Git sync — runs after response is sent, kept alive by after()
+  console.log(`[skynest] step: commitFile path=${id}.md`);
+  after(async () => {
+    try {
+      await sync.commitFile({
+        path: `${id}.md`,
+        content: Buffer.from(content, 'utf-8'),
+        message: `ingest: meeting ${payload.session_id}`,
+        editedBy: 'readai-webhook',
+        userToken: botToken,
+      });
+      console.log(`[skynest] git sync ok vault=${resolvedVaultId} doc=${id}`);
+    } catch (err) {
+      console.error(`[skynest] git sync failed:`, err);
+    }
+  });
+
+  return NextResponse.json({ ok: true }, { status: 200 });
+}

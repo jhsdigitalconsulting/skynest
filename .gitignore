@@ -1,0 +1,43 @@
+# Local dev scripts
+mint-test-token.mjs
+
+# Local env files
+.env.local
+.env.*.local
+.env
+
+
+# Node
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Build outputs
+dist/
+build/
+# Vendored packages commit their compiled dist
+!services/contextnest-mcp-host/vendor/**/dist/
+
+# Vercel
+.vercel/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Claude Code local session data (worktrees, settings)
+.claude/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.playwright-mcp/*.yml
+.vercel
+.env*.local

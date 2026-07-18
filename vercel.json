@@ -1,0 +1,5 @@
+{
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm --filter @promptowl/contextnest-engine build && next build",
+  "framework": "nextjs"
+}

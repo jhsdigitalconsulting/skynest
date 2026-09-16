@@ -8,7 +8,10 @@
  *
  *   pnpm tsx scripts/update-knowledge-docs.ts
  *
- * Bodies are read from scripts/_kd/{registry,vocab,examples}.md.
+ * Bodies are read from scripts/_kd/{registry,vocab,examples}.md — a gitignored
+ * local directory. Each operator seeds their own copies of these three files;
+ * they are never committed to this repo since their content (client/project
+ * registry, tagging examples) is operator-specific.
  */
 import 'dotenv/config';
 import { readFileSync } from 'node:fs';
@@ -44,7 +47,7 @@ async function main() {
     await storage.writeDocument(id, content);
     await publishDocument(storage, id, {
       editedBy: 'skynest-bot',
-      note: 'Encode QA feedback: client-id rules, aliases, recruiting topic',
+      note: `Update knowledge doc from local file: ${bodyPath}`,
     });
     await sync.commitFile({
       path: `${id}.md`, content: Buffer.from(content, 'utf-8'),

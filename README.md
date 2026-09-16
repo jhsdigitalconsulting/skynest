@@ -119,6 +119,8 @@ This outputs `OAUTH_JWT_PRIVATE_KEY` and `OAUTH_JWT_PUBLIC_KEY` values for your 
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jhs129/skynest)
 
+> If you're deploying from a fork, update the `repository-url` query param above to point at your own org/repo before sharing this button.
+
 Or deploy via the CLI:
 
 ```bash

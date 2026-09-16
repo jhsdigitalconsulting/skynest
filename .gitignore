@@ -1,6 +1,10 @@
 # Local dev scripts
 mint-test-token.mjs
 
+# Operator-specific knowledge-doc seeds for scripts/update-knowledge-docs.ts
+# (client/project registry, tagging examples — never committed)
+scripts/_kd/
+
 # Local env files
 .env.local
 .env.*.local
@@ -45,3 +49,4 @@ pnpm-debug.log*
 .playwright-mcp/*.yml
 .vercel
 .env*.local
+.env*

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let Skynest's MCP endpoint accept a bearer token issued directly by a configured trusted Entra tenant, in addition to (never instead of) tokens it issues itself, so Copilot Studio's native on-behalf-of connector flow (KAN-38) can authenticate against Skynest without Skynest becoming lifestory/OC360-specific.
+**Goal:** Let Skynest's MCP endpoint accept a bearer token issued directly by a configured trusted Entra tenant, in addition to (never instead of) tokens it issues itself, so Copilot Studio's native on-behalf-of connector flow (KAN-38) can authenticate against Skynest without Skynest becoming connectorx-specific.
 
 **Architecture:** `verifyMcpToken` inspects the token's `iss` claim before verification and routes to one of two independent branches: the existing self-issued-AS branch (unchanged), or a new external branch that resolves signing keys via OIDC discovery, verifies signature/issuer/audience, and — because externally-issued tokens never pass through Skynest's own `/oauth/token` issuance endpoint — calls `AuthorizationProvider.checkAccess()` itself using the token's own `groups` claim. The `.well-known/oauth-protected-resource` route becomes additive, listing the trusted issuer alongside Skynest's own origin only when configured.
 
@@ -13,7 +13,7 @@
 - Both `MCP_TRUSTED_ISSUER` and `MCP_TRUSTED_AUDIENCE` unset → behavior must be byte-for-byte identical to today (self-issued-AS-only, PRM `authorization_servers` unchanged). Verify this explicitly in tests, not just by omission.
 - No changes to `AuthorizationProvider` / `AuthorizationFactory` (`src/lib/authorization/**`) or their existing tests — the external branch is a new *caller* of `createAuthorizationProvider().checkAccess()`, not a new interface.
 - No changes to the self-issued OAuth flow (`oauth/authorize`, `oauth/token`, `getPublicKey`/`getPrivateKey`).
-- Fully generic: no lifestory/OC360-specific naming, branching, or config anywhere in this change.
+- Fully generic: no connectorx-specific naming, branching, or config anywhere in this change.
 - JWKS keys are resolved via OIDC discovery (`${MCP_TRUSTED_ISSUER}/.well-known/openid-configuration` → `jwks_uri`), never a hardcoded JWKS URL. The discovery document is cached ~5 minutes.
 - Work happens directly on the already-checked-out `KAN-76` branch — do not create a new branch.
 - Package manager is `pnpm`. After the final task, `pnpm build` and `pnpm lint` must both be clean.
@@ -711,4 +711,4 @@ git commit -m "docs: document MCP_TRUSTED_ISSUER / MCP_TRUSTED_AUDIENCE env vars
 
 ## Manual Verification (not automated, do after all 4 tasks)
 
-Per the spec's acceptance criteria, once `ca-skynest-dev` has `MCP_TRUSTED_ISSUER` / `MCP_TRUSTED_AUDIENCE` configured (values from the `OC360-Skynest` app registration, per `scripts/03-app-registrations.ps1`), confirm the KAN-38 connector's native OBO handshake succeeds end-to-end against that environment. This depends on KAN-38's connector artifacts and deployed env config, and is out of scope for this plan's automated steps — flag it to the user as the remaining manual step before closing KAN-88.
+Per the spec's acceptance criteria, once `ca-skynest-dev` has `MCP_TRUSTED_ISSUER` / `MCP_TRUSTED_AUDIENCE` configured (values from the `ConnectorX-Skynest` app registration, per `scripts/03-app-registrations.ps1`), confirm the KAN-38 connector's native OBO handshake succeeds end-to-end against that environment. This depends on KAN-38's connector artifacts and deployed env config, and is out of scope for this plan's automated steps — flag it to the user as the remaining manual step before closing KAN-88.

@@ -30,13 +30,13 @@ server," the same concept RFC 9728 already models by allowing
   `checkAccess(identity)` interface — the external branch is a new *caller*
   of that existing interface, not a new authorization mechanism. Group-based
   access decisions continue to work exactly as they do today.
-- No lifestory/OC360-specific naming, config, or branching anywhere in this
+- No connectorx-specific naming, config, or branching anywhere in this
   change — this must read as generic multi-tenant-IdP support, usable by any
   Skynest deployment.
 - No per-vault configuration for the new env vars (they're global, matching
   the existing `MCP_AUTH_DISABLED` pattern) — out of scope until a deployment
   actually needs per-vault trusted issuers.
-- No changes to the connector artifacts themselves (`connector/oc360-cs-connector/`)
+- No changes to the connector artifacts themselves (`connector/connectorx-cs-connector/`)
   — that's KAN-38's scope, not this ticket's.
 
 ## Architecture
@@ -47,7 +47,7 @@ server," the same concept RFC 9728 already models by allowing
   `https://login.microsoftonline.com/{tenant-guid}/v2.0`.
 - `MCP_TRUSTED_AUDIENCE` — the expected `aud` claim, e.g.
   `api://<Skynest-AppId>` (the Identifier URI configured on the
-  `OC360-Skynest` app registration by `scripts/03-app-registrations.ps1`).
+  `ConnectorX-Skynest` app registration by `scripts/03-app-registrations.ps1`).
 
 Both unset (the default today, and for any deployment that hasn't configured
 this) → `verifyMcpToken` behaves byte-for-byte as it does now: self-issued-AS
@@ -120,7 +120,7 @@ const scopes = access === 'write' ? ['mcp:read', 'mcp:write'] : ['mcp:read'];
 ```
 
 `idpGroups` comes directly from the verified token's own `groups` claim — the
-`OC360-Skynest` app registration already sets `GroupMembershipClaims =
+`ConnectorX-Skynest` app registration already sets `GroupMembershipClaims =
 SecurityGroup` (`scripts/03-app-registrations.ps1`), so this is populated for
 any user in ≤200 groups, the common case. **Known limitation:** if the claim
 is absent due to Entra's groups-overage behavior, `EntraAuthorizationProvider`

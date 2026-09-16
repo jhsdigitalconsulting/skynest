@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Re-engineer the Read.ai tagging pipeline to tag every meeting by **client** (billing + sub-client), **project** (Harvest code + name), and **topic** (canonical + free-form), wired to John's Harvest context; then re-tag every existing meeting and stand up a QA/feedback loop to refine the tagger over time.
+**Goal:** Re-engineer the Read.ai tagging pipeline to tag every meeting by **client** (billing + sub-client), **project** (Harvest code + name), and **topic** (canonical + free-form), wired to the operator's Harvest context; then re-tag every existing meeting and stand up a QA/feedback loop to refine the tagger over time.
 
-**Architecture:** Three vault "knowledge" documents feed the tagger — (1) a client/project **registry** (John's existing Harvest context doc), (2) a canonical **topic vocabulary**, (3) a **tagging-examples / corrections** doc (few-shot, the durable training surface). The analyzer is refactored to a model-agnostic `MeetingInput`, with an extended structured output (billing client, end/sub-client, project `{code,name}`, canonical + free-form topics). `document.ts` emits namespaced tags (`#client_*`, `#subclient_*`, `#project_*`, `#topic_*`, free-form) plus structured metadata for retrieval. A backfill script reconstructs `MeetingInput` from existing meeting docs, runs the **real production analyzer**, and — after a dry-run QA checkpoint — rewrites tags/metadata across the corpus. The QA loop is: dry-run review → John's feedback → encode into the three knowledge docs → re-run.
+**Architecture:** Three vault "knowledge" documents feed the tagger — (1) a client/project **registry** (the operator's existing Harvest context doc), (2) a canonical **topic vocabulary**, (3) a **tagging-examples / corrections** doc (few-shot, the durable training surface). The analyzer is refactored to a model-agnostic `MeetingInput`, with an extended structured output (billing client, end/sub-client, project `{code,name}`, canonical + free-form topics). `document.ts` emits namespaced tags (`#client_*`, `#subclient_*`, `#project_*`, `#topic_*`, free-form) plus structured metadata for retrieval. A backfill script reconstructs `MeetingInput` from existing meeting docs, runs the **real production analyzer**, and — after a dry-run QA checkpoint — rewrites tags/metadata across the corpus. The QA loop is: dry-run review → the operator's feedback → encode into the three knowledge docs → re-run.
 
 **Tech Stack:** Next.js App Router, TypeScript, Zod, Vercel AI Gateway (`anthropic/claude-haiku-4-5`), Vitest, `@promptowl/contextnest-engine` (Blob storage + git sync), `tsx` for scripts.
 
@@ -17,9 +17,9 @@
 | Dimension | Tag form | Example | Always present? |
 |---|---|---|---|
 | Meeting marker | `#meetings` | `#meetings` | Yes |
-| Billing client | `#client_<slug>` | `#client_laughlin-constable` | Yes (or `#client_unknown`) |
-| End / sub-client | `#subclient_<slug>` | `#subclient_alz-org` | Only when end client ≠ billing client |
-| Project | `#project_<code>` | `#project_oh26mt` (code lowercased) | When a project is identified |
+| Billing client | `#client_<slug>` | `#client_blackwood-partners` | Yes (or `#client_unknown`) |
+| End / sub-client | `#subclient_<slug>` | `#subclient_riverside-org` | Only when end client ≠ billing client |
+| Project | `#project_<code>` | `#project_acme26mt` (code lowercased) | When a project is identified |
 | Canonical topic | `#topic_<name>` | `#topic_go-live` | 1–N |
 | Free-form topic | `#<name>` | `#sitecore`, `#sprint-38` | 0–2 |
 | Needs review | `#needs-review` | `#needs-review` | When confidence=low or tagger errored |
@@ -28,12 +28,12 @@
 ```yaml
 metadata:
   document_type: meeting
-  client: laughlin-constable          # billing client slug
-  client_name: Laughlin Constable
-  subclient: alz-org                  # omitted when no sub-client
-  subclient_name: ALZ.org
-  project_code: LCALZ                 # omitted when no project
-  project: ALZ RFP
+  client: blackwood-partners          # billing client slug
+  client_name: Blackwood Partners
+  subclient: riverside-org                  # omitted when no sub-client
+  subclient_name: Riverside.org
+  project_code: BWRIV                 # omitted when no project
+  project: Riverside RFP
   topics: [go-live, seo]              # canonical + free-form, flat list
   meeting_date: 2026-06-08T14:00:00Z
   participants: [a@x.com, b@y.com]
@@ -45,7 +45,7 @@ metadata:
   tagger_confidence: high
   # tagger_error: true               # only when the model call failed
 ```
-Retrieval works three ways for every dimension: faceted (`resolve("#project_oh26mt + #meetings")`), exact (`metadata.project_code`), and full-text (readable names live in metadata **and** body).
+Retrieval works three ways for every dimension: faceted (`resolve("#project_acme26mt + #meetings")`), exact (`metadata.project_code`), and full-text (readable names live in metadata **and** body).
 
 **Knowledge doc paths (single source of truth, all human-editable):**
 - Registry: `nodes/clients/harvest-client-project-context` (already in the vault)
@@ -138,10 +138,10 @@ Few-shot guidance injected into the tagger prompt. Each example is a correction
 captured during QA — add a new block whenever the tagger gets one wrong.
 
 ## Rules
-- "OH Web Scrum" / "OH.com" → billing client Orlando Health (OH26MT). Topic: scrum (or go-live for launch meetings).
-- "ALZ.org" pitch/preso → billing client Laughlin Constable, sub-client ALZ.org, project LCALZ. Topic: proposal.
+- "Acme Web Scrum" / "OH.com" → billing client Acme Corp (ACME26MT). Topic: scrum (or go-live for launch meetings).
+- "Riverside.org" pitch/preso → billing client Blackwood Partners, sub-client Riverside.org, project BWRIV. Topic: proposal.
 - "DP Seeds" → personal/owned business; billing client NE Seed (NESO) unless context says otherwise.
-- Builder.io / Vercel are PARTNERS on Orlando Health (OH26MT), not clients — tag client Orlando Health + free-form #builder-io / #vercel.
+- Builder.io / Vercel are PARTNERS on Acme Corp (ACME26MT), not clients — tag client Acme Corp + free-form #builder-io / #vercel.
 
 ## Examples
 (none yet — QA will add corrected examples here)
@@ -174,12 +174,12 @@ import { MeetingAnalysisSchema } from './schema';
 describe('MeetingAnalysisSchema', () => {
   it('accepts a full analysis with sub-client and project', () => {
     const parsed = MeetingAnalysisSchema.safeParse({
-      billing_client: { name: 'Laughlin Constable', slug: 'laughlin-constable' },
-      end_client: { name: 'ALZ.org', slug: 'alz-org' },
-      project: { code: 'LCALZ', name: 'ALZ RFP' },
+      billing_client: { name: 'Blackwood Partners', slug: 'blackwood-partners' },
+      end_client: { name: 'Riverside.org', slug: 'riverside-org' },
+      project: { code: 'BWRIV', name: 'Riverside RFP' },
       confidence: 'high',
       topics_canonical: ['proposal'],
-      topics_freeform: ['alz-org'],
+      topics_freeform: ['riverside-org'],
       summary: 'Pitch prep.',
       action_items: ['Finalize deck'],
     });
@@ -188,7 +188,7 @@ describe('MeetingAnalysisSchema', () => {
 
   it('accepts null end_client and null project', () => {
     const parsed = MeetingAnalysisSchema.safeParse({
-      billing_client: { name: 'Orlando Health', slug: 'orlando-health' },
+      billing_client: { name: 'Acme Corp', slug: 'orlando-health' },
       end_client: null,
       project: null,
       confidence: 'medium',
@@ -297,10 +297,10 @@ import { analyzeMeeting } from './analyze';
 const mockGenerateText = vi.mocked(generateText);
 
 const INPUT: MeetingInput = {
-  title: 'OH Web Scrum',
+  title: 'Acme Web Scrum',
   date: '2026-06-08T14:00:00Z',
   platform: 'teams',
-  participants: [{ name: 'John Schneider', email: 'john.schneider@orlandohealth.com' }],
+  participants: [{ name: 'Alex Rivera', email: 'alex.rivera@acmecorp.com' }],
   summary: 'Sprint 38 planning.',
   topics: ['sprint planning'],
   actionItems: ['Add Alex to Vercel'],
@@ -308,15 +308,15 @@ const INPUT: MeetingInput = {
 };
 
 const KNOWLEDGE = {
-  registry: '| `orlandohealth.com` | Orlando Health | Orlando Health | 2026 Martech Staffing (OH26MT) |',
+  registry: '| `acmecorp.com` | Acme Corp | Acme Corp | 2026 Martech Staffing (ACME26MT) |',
   topicVocab: '- `scrum` — standups',
-  examples: 'OH Web Scrum -> Orlando Health, OH26MT, topic scrum',
+  examples: 'Acme Web Scrum -> Acme Corp, ACME26MT, topic scrum',
 };
 
 const VALID = JSON.stringify({
-  billing_client: { name: 'Orlando Health', slug: 'orlando-health' },
+  billing_client: { name: 'Acme Corp', slug: 'orlando-health' },
   end_client: null,
-  project: { code: 'OH26MT', name: '2026 Martech Staffing' },
+  project: { code: 'ACME26MT', name: '2026 Martech Staffing' },
   confidence: 'high',
   topics_canonical: ['scrum'],
   topics_freeform: [],
@@ -338,7 +338,7 @@ describe('analyzeMeeting', () => {
     mockGenerateText.mockResolvedValue(resolve(VALID));
     const r = await analyzeMeeting(INPUT, KNOWLEDGE);
     expect(r.billing_client.slug).toBe('orlando-health');
-    expect(r.project?.code).toBe('OH26MT');
+    expect(r.project?.code).toBe('ACME26MT');
     expect(r.confidence).toBe('high');
     expect(r.tagger_error).toBeUndefined();
   });
@@ -366,10 +366,10 @@ describe('analyzeMeeting', () => {
     mockGenerateText.mockResolvedValue(resolve(VALID));
     await analyzeMeeting(INPUT, KNOWLEDGE);
     const prompt = mockGenerateText.mock.calls[0][0].prompt as string;
-    expect(prompt).toContain('orlandohealth.com');
+    expect(prompt).toContain('acmecorp.com');
     expect(prompt).toContain('scrum');
-    expect(prompt).toContain('OH Web Scrum');
-    expect(prompt).toContain('OH26MT');
+    expect(prompt).toContain('Acme Web Scrum');
+    expect(prompt).toContain('ACME26MT');
   });
 });
 ```
@@ -415,8 +415,8 @@ function buildPrompt(input: MeetingInput, k: TaggerKnowledge): string {
 
 ## Client & Project Registry
 Match participant email domains and meeting content to the BILLING client and project.
-When the end client differs from who is billed (e.g. ALZ.org under Laughlin Constable,
-Georgia Core under Radical Design, Aventiv under Goods & Services), report both.
+When the end client differs from who is billed (e.g. Riverside.org under Blackwood Partners,
+Summit Studio under Vertex Design, Meridian Corp under Union Services), report both.
 ${k.registry || '(no registry available)'}
 
 ## Canonical Topic Vocabulary
@@ -509,10 +509,10 @@ import type { MeetingInput } from './input';
 import type { MeetingAnalysis } from './schema';
 
 const INPUT: MeetingInput = {
-  title: 'ALZ.org Pitch',
+  title: 'Riverside.org Pitch',
   date: '2026-06-01T14:00:00Z',
   platform: 'zoom',
-  participants: [{ name: 'Jane', email: 'jane@laughlin-constable.com' }],
+  participants: [{ name: 'Jane', email: 'jane@blackwood-partners.com' }],
   summary: 'Pitch prep.',
   topics: ['pitch'],
   actionItems: ['Finalize deck'],
@@ -520,12 +520,12 @@ const INPUT: MeetingInput = {
 };
 
 const ANALYSIS: MeetingAnalysis & { tagger_error?: boolean } = {
-  billing_client: { name: 'Laughlin Constable', slug: 'laughlin-constable' },
-  end_client: { name: 'ALZ.org', slug: 'alz-org' },
-  project: { code: 'LCALZ', name: 'ALZ RFP' },
+  billing_client: { name: 'Blackwood Partners', slug: 'blackwood-partners' },
+  end_client: { name: 'Riverside.org', slug: 'riverside-org' },
+  project: { code: 'BWRIV', name: 'Riverside RFP' },
   confidence: 'high',
   topics_canonical: ['proposal'],
-  topics_freeform: ['alz-org'],
+  topics_freeform: ['riverside-org'],
   summary: 'Pitch prep.',
   action_items: ['Finalize deck'],
 };
@@ -535,11 +535,11 @@ describe('buildMeetingDocument', () => {
     const { frontmatter } = buildMeetingDocument(INPUT, ANALYSIS, 'req_1', 'sess_1', 'https://r');
     expect(frontmatter.tags).toEqual(expect.arrayContaining([
       '#meetings',
-      '#client_laughlin-constable',
-      '#subclient_alz-org',
-      '#project_lcalz',
+      '#client_blackwood-partners',
+      '#subclient_riverside-org',
+      '#project_bwriv',
       '#topic_proposal',
-      '#alz-org',
+      '#riverside-org',
     ]));
     expect(frontmatter.tags).not.toContain('#needs-review');
   });
@@ -547,12 +547,12 @@ describe('buildMeetingDocument', () => {
   it('writes structured metadata for code + name retrieval', () => {
     const { frontmatter } = buildMeetingDocument(INPUT, ANALYSIS, 'req_1', 'sess_1', 'https://r');
     const m = frontmatter.metadata as Record<string, unknown>;
-    expect(m.client).toBe('laughlin-constable');
-    expect(m.client_name).toBe('Laughlin Constable');
-    expect(m.subclient).toBe('alz-org');
-    expect(m.project_code).toBe('LCALZ');
-    expect(m.project).toBe('ALZ RFP');
-    expect(m.topics).toEqual(['proposal', 'alz-org']);
+    expect(m.client).toBe('blackwood-partners');
+    expect(m.client_name).toBe('Blackwood Partners');
+    expect(m.subclient).toBe('riverside-org');
+    expect(m.project_code).toBe('BWRIV');
+    expect(m.project).toBe('Riverside RFP');
+    expect(m.topics).toEqual(['proposal', 'riverside-org']);
   });
 
   it('omits subclient/project keys when absent', () => {
@@ -563,7 +563,7 @@ describe('buildMeetingDocument', () => {
     const m = frontmatter.metadata as Record<string, unknown>;
     expect(m.subclient).toBeUndefined();
     expect(m.project_code).toBeUndefined();
-    expect(frontmatter.tags).not.toContain('#subclient_alz-org');
+    expect(frontmatter.tags).not.toContain('#subclient_riverside-org');
   });
 
   it('adds #needs-review on low confidence', () => {
@@ -821,7 +821,7 @@ import { parseMeetingDoc } from './parse-meeting-doc';
 const BODY = `
 ## Meeting Details
 - **Date:** 2026-06-08
-- **Participants:** Lance Amolo (p-lamolo@orlandohealth.com), John Schneider (john.schneider@orlandohealth.com)
+- **Participants:** Priya Fernandez (p-friviera@acmecorp.com), Alex Rivera (alex.rivera@acmecorp.com)
 - **Platform:** teams
 - **Read.ai ID:** 01KTKR670BP022RK2Y9B76CQPF
 
@@ -831,12 +831,12 @@ Sprint 38 planning and deploy unblock.
 
 describe('parseMeetingDoc', () => {
   it('extracts participants emails, summary, date, readai id', () => {
-    const input = parseMeetingDoc('Orlando Health — OH Web Scrum — 2026-06-08', BODY);
+    const input = parseMeetingDoc('Acme Corp — Acme Web Scrum — 2026-06-08', BODY);
     expect(input.participants.map((p) => p.email)).toEqual(
-      expect.arrayContaining(['p-lamolo@orlandohealth.com', 'john.schneider@orlandohealth.com']),
+      expect.arrayContaining(['p-friviera@acmecorp.com', 'alex.rivera@acmecorp.com']),
     );
     expect(input.summary).toContain('Sprint 38');
-    expect(input.title).toBe('OH Web Scrum');
+    expect(input.title).toBe('Acme Web Scrum');
     expect(input.date.slice(0, 10)).toBe('2026-06-08');
   });
 });
@@ -899,7 +899,7 @@ export function parseMeetingDoc(title: string, body: string): MeetingInput {
  *
  *   pnpm tsx scripts/backfill-meeting-tags.ts --dry-run            # all meetings -> review report
  *   pnpm tsx scripts/backfill-meeting-tags.ts --dry-run --limit 8  # pilot batch
- *   pnpm tsx scripts/backfill-meeting-tags.ts --apply --only nodes/meetings/2026-06-08-oh-web-scrum
+ *   pnpm tsx scripts/backfill-meeting-tags.ts --apply --only nodes/meetings/2026-06-08-acme-web-scrum
  *   pnpm tsx scripts/backfill-meeting-tags.ts --apply             # rewrite all
  *
  * Requires env (loaded from .env.local): CONTEXTNEST_STORAGE, CONTEXTNEST_BLOB_PREFIX,
@@ -1004,7 +1004,7 @@ main().catch((e) => { console.error(e); process.exit(1); });
 
 - [ ] **Step 2: Ensure `tsx` + `dotenv` are available.** `pnpm add -D tsx dotenv` (skip if already present — check `package.json` first).
 
-- [ ] **Step 3: Smoke-test parse path without hitting the model.** Run a single dry-run on one doc: `pnpm tsx scripts/backfill-meeting-tags.ts --dry-run --only nodes/meetings/2026-06-08-oh-web-scrum`. Expected: prints one line and writes a report. If AI Gateway auth fails locally, run `vercel env pull .env.local` to refresh `VERCEL_OIDC_TOKEN`, then retry.
+- [ ] **Step 3: Smoke-test parse path without hitting the model.** Run a single dry-run on one doc: `pnpm tsx scripts/backfill-meeting-tags.ts --dry-run --only nodes/meetings/2026-06-08-acme-web-scrum`. Expected: prints one line and writes a report. If AI Gateway auth fails locally, run `vercel env pull .env.local` to refresh `VERCEL_OIDC_TOKEN`, then retry.
 
 - [ ] **Step 4: Commit.** `git add -A && git commit -m "feat(backfill): re-tag script with dry-run + apply"`
 
@@ -1016,16 +1016,16 @@ main().catch((e) => { console.error(e); process.exit(1); });
 
 - [ ] **Step 1: Run a dry-run on the full corpus.** `pnpm tsx scripts/backfill-meeting-tags.ts --dry-run`. This calls the real Haiku tagger on every meeting and writes `docs/superpowers/reviews/retag-<date>.md`.
 
-- [ ] **Step 2: Present the report to John.** Surface the report (especially `#needs-review` / low-confidence rows and any `client: unknown`). **STOP for review** — this is the QA checkpoint John asked for.
+- [ ] **Step 2: Present the report to the operator.** Surface the report (especially `#needs-review` / low-confidence rows and any `client: unknown`). **STOP for review** — this is the QA checkpoint John asked for.
 
-### Task 5.2: Encode John's feedback into the knowledge docs
+### Task 5.2: Encode the operator's feedback into the knowledge docs
 
 - [ ] **Step 1: For each correction, decide where it belongs:**
   - Wrong/missing client↔domain or project↔code → fix `nodes/clients/harvest-client-project-context` (registry).
   - New or renamed topic, synonym collapse → fix `nodes/processes/meeting-topic-vocabulary`.
   - A subtle judgment the model keeps missing → add a worked example to `nodes/processes/meeting-tagging-examples` (title → correct billing client / sub-client / project / topics, with a one-line reason).
 - [ ] **Step 2: Update + publish** the relevant doc(s) via skynest MCP (`update_document` then `publish_document`).
-- [ ] **Step 3: Re-run the pilot dry-run** and confirm the corrected meetings now tag correctly. Repeat 5.1→5.2 until John signs off on the sample.
+- [ ] **Step 3: Re-run the pilot dry-run** and confirm the corrected meetings now tag correctly. Repeat 5.1→5.2 until the operator signs off on the sample.
 
 ### Task 5.3: Document the loop
 
@@ -1040,9 +1040,9 @@ main().catch((e) => { console.error(e); process.exit(1); });
 - [ ] **Step 1: Apply.** After sign-off: `pnpm tsx scripts/backfill-meeting-tags.ts --apply`. Each doc is rewritten (body preserved), published, and git-synced.
 - [ ] **Step 2: Verify integrity.** `mcp__skynest__verify_integrity` — Expected: all hash chains valid.
 - [ ] **Step 3: Spot-check retrieval.** Confirm faceted retrieval works:
-  - `mcp__skynest__resolve({ selector: "#project_oh26mt + #meetings", hops: 1 })` → returns Orlando Health Martech meetings.
+  - `mcp__skynest__resolve({ selector: "#project_acme26mt + #meetings", hops: 1 })` → returns Acme Corp Martech meetings.
   - `mcp__skynest__resolve({ selector: "#needs-review", hops: 1 })` → returns only genuinely ambiguous meetings.
-  - `mcp__skynest__search({ query: "ALZ.org", hops: 1 })` → returns Laughlin/ALZ meetings (full-text via body + metadata).
+  - `mcp__skynest__search({ query: "Riverside.org", hops: 1 })` → returns Blackwood/Riverside meetings (full-text via body + metadata).
 - [ ] **Step 4: Final commit.** `git add -A && git commit -m "chore(meetings): backfill complete — client/project/topic tags across corpus"` (vault writes already synced via bot; this commits any local report/doc changes).
 
 ---

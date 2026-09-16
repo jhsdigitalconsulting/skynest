@@ -22,7 +22,7 @@ const UNKNOWN: MeetingAnalysis = {
 
 // Pull every email domain we can see — from the structured participant list AND
 // from the meeting text itself. Read.ai docs often write attendees as
-// "Jane, Bob (all @orlandohealth.com)", so the domain lives in prose, not in a
+// "Jane, Bob (all @acmecorp.com)", so the domain lives in prose, not in a
 // parseable address. Domains are the strongest billing-client signal, so we
 // surface them explicitly rather than hoping the model spots them inline.
 function extractDomains(input: MeetingInput): string[] {
@@ -59,12 +59,12 @@ function buildPrompt(input: MeetingInput, knowledge: TaggerKnowledge): string {
 ## How to pick the client
 The participant EMAIL DOMAINS are the strongest signal for the billing client.
 Match them against the registry's domain lookup FIRST, before weighing the meeting
-content. A single attendee on a known client domain (e.g. someone @centurycommunities.com
-or @orlandohealth.com) is enough to assign that client with high confidence — do NOT
+content. A single attendee on a known client domain (e.g. someone @cornerstonehomes.com
+or @acmecorp.com) is enough to assign that client with high confidence — do NOT
 return "unknown" when a domain clearly matches the registry. Only fall back to the
 Client Identification Rules and meeting content when no attendee domain matches.
-When the end client differs from who is billed (e.g. ALZ.org under Laughlin Constable,
-Georgia Core under Radical Design, Aventiv under Goods & Services), report both.
+When the end client differs from who is billed (e.g. Riverside.org under Blackwood Partners,
+Summit Studio under Vertex Design, Meridian Corp under Union Services), report both.
 
 ## Client & Project Registry
 ${knowledge.registry || '(no registry available)'}

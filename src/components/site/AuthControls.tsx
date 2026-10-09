@@ -1,7 +1,5 @@
-import Link from 'next/link';
 import { auth, signOut } from '@/lib/auth';
-
-export const LOGIN_HREF = '/auth/signin?callbackUrl=/vault';
+import { LoginButton } from './LoginButton';
 
 interface ViewProps {
   userName?: string;
@@ -11,12 +9,9 @@ interface ViewProps {
 export function AuthControlsView({ userName, signOutAction }: ViewProps) {
   if (!userName) {
     return (
-      <Link
-        href={LOGIN_HREF}
-        className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-      >
+      <LoginButton className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
         Log in
-      </Link>
+      </LoginButton>
     );
   }
 

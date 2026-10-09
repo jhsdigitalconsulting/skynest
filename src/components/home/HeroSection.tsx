@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { LOGIN_HREF } from '@/components/site/AuthControls';
+import { LoginButton } from '@/components/site/LoginButton';
 
 interface Props {
   signedIn?: boolean;
@@ -17,12 +17,18 @@ export function HeroSection({ signedIn = false }: Props) {
         tools through one secure connection.
       </p>
       <div className="flex items-center justify-center gap-4">
-        <Link
-          href={signedIn ? '/vault' : LOGIN_HREF}
-          className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
-        >
-          {signedIn ? 'Open vault →' : 'Log in →'}
-        </Link>
+        {signedIn ? (
+          <Link
+            href="/vault"
+            className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+          >
+            Open vault →
+          </Link>
+        ) : (
+          <LoginButton className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors">
+            Log in →
+          </LoginButton>
+        )}
         <Link
           href="/docs"
           className="inline-block border border-gray-300 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors"

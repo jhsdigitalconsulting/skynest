@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-vi.mock('@/lib/auth', () => ({ auth: vi.fn(), signOut: vi.fn() }));
+vi.mock('@/lib/auth', () => ({ auth: vi.fn(), signIn: vi.fn(), signOut: vi.fn() }));
 
 import { HeroSection } from './HeroSection';
 
@@ -14,8 +14,9 @@ describe('HeroSection', () => {
 
   it('leads with a Log in button when signed out', () => {
     const html = renderToStaticMarkup(<HeroSection />);
-    expect(html).toContain('href="/auth/signin?callbackUrl=/vault"');
+    expect(html).toContain('<form');
     expect(html).toContain('Log in');
+    expect(html).not.toContain('/auth/signin');
     expect(html).not.toContain('Open vault');
   });
 

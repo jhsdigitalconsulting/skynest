@@ -21,8 +21,8 @@ importers:
         specifier: 1.26.0
         version: 1.26.0(zod@3.25.76)
       '@promptowl/contextnest-engine':
-        specifier: file:./vendor/packages/engine
-        version: file:vendor/packages/engine
+        specifier: link:./vendor/packages/engine
+        version: link:vendor/packages/engine
       '@tiptap/core':
         specifier: 3.31.4
         version: 3.31.4(@tiptap/pm@3.31.4)
@@ -1160,9 +1160,6 @@ packages:
 
   '@panva/hkdf@1.2.1':
     resolution: {integrity: sha512-6oclG6Y3PiDFcoyk8srjLfVKyMfVCKJ27JwNPViuXziFpmdz+MZnZN/aKY0JGXgYuO/VghU0jcOAZgWXZ1Dmrw==}
-
-  '@promptowl/contextnest-engine@file:vendor/packages/engine':
-    resolution: {directory: vendor/packages/engine, type: directory}
 
   '@redis/bloom@1.2.0':
     resolution: {integrity: sha512-HG2DFjYKbpNmVXsa0keLHp/3leGJz1mjh09f2RLGGLQZzSHpkmZWuwJbAvo3QcRY8p80m5+ZdXZdYOSBLlp7Cg==}
@@ -5183,20 +5180,6 @@ snapshots:
   '@opentelemetry/api@1.9.1': {}
 
   '@panva/hkdf@1.2.1': {}
-
-  '@promptowl/contextnest-engine@file:vendor/packages/engine':
-    dependencies:
-      '@modelcontextprotocol/sdk': 1.30.0(zod@3.25.76)
-      diff: 9.0.0
-      fast-glob: 3.3.3
-      js-yaml: 4.3.2
-      minisearch: 7.2.0
-      toposort: 2.0.2
-      zod: 3.25.76
-      zod-to-json-schema: 3.25.2(zod@3.25.76)
-    transitivePeerDependencies:
-      - '@cfworker/json-schema'
-      - supports-color
 
   '@redis/bloom@1.2.0(@redis/client@1.6.1)':
     dependencies:

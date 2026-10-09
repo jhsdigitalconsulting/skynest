@@ -45,13 +45,16 @@ const GROUPS: EnvGroup[] = [
       { name: 'AUTHZ_GITHUB_REPO', req: 'github', description: "owner/repo whose GitHub collaborator permission decides access (push/admin → write, pull → read, none → 403). Usually the same as VAULT_REPO." },
       { name: 'AUTHZ_ENTRA_WRITE_GROUP_ID', req: 'entra', default: '(none → no write)', description: 'Comma-separated Entra group object ID(s) whose members get mcp:read + mcp:write.' },
       { name: 'AUTHZ_ENTRA_READ_GROUP_ID', req: 'entra', default: '(none → no read)', description: 'Comma-separated Entra group object ID(s) whose members get mcp:read only.' },
+      { name: 'AUTHZ_REVIEWERS', req: 'optional', default: '(none → every writer)', description: 'Comma-separated logins (GitHub usernames or Entra UPNs/emails) who may approve drafts. Case-insensitive. Reviewers reached over MCP must be listed here.' },
+      { name: 'AUTHZ_ENTRA_REVIEWER_GROUP_ID', req: 'optional', description: 'Entra group whose members are reviewers in the web vault UI. MCP tokens carry no group claims, so this applies to the UI only.' },
+      { name: 'CONTEXTNEST_REQUIRE_REVIEW', req: 'optional', default: 'false', description: "When 'true', direct create/update from non-reviewers becomes a draft in the review queue, and publish/delete are limited to reviewers." },
     ],
   },
   {
     title: 'OAuth token signing & registration',
     vars: [
-      { name: 'OAUTH_PRIVATE_KEY', req: 'required', description: 'RS256 private key (full PEM) used to sign authorization codes and access tokens. From pnpm oauth:gen-keypair.' },
-      { name: 'OAUTH_PUBLIC_KEY', req: 'required', description: 'RS256 public key (full PEM) used to verify self-issued tokens and published as JWKS.' },
+      { name: 'OAUTH_JWT_PRIVATE_KEY', req: 'required', description: 'RS256 private key (full PEM) used to sign authorization codes and access tokens. From pnpm oauth:gen-keypair.' },
+      { name: 'OAUTH_JWT_PUBLIC_KEY', req: 'required', description: 'RS256 public key (full PEM) used to verify self-issued tokens and published as JWKS.' },
       { name: 'ACCESS_TOKEN_TTL_SECONDS', req: 'optional', default: '604800 (7 days)', description: 'Lifetime of issued OAuth access tokens.' },
       { name: 'OAUTH_REGISTRATION_SECRET', req: 'optional', description: 'If set, dynamic client registration requires a matching Bearer token. If unset, registration falls back to loopback / allowlisted-origin checks.' },
       { name: 'OAUTH_ALLOWED_REDIRECT_ORIGINS', req: 'optional', default: "'' (loopback only)", description: 'Comma-separated HTTPS origins allowed as redirect URIs during registration (e.g. https://claude.ai for the Claude Desktop app).' },
@@ -73,8 +76,11 @@ const GROUPS: EnvGroup[] = [
       { name: 'CONTEXTNEST_STORAGE_PROVIDER', req: 'optional', default: 'vercel', description: "When storage=blob, the backend: 'vercel' (Vercel Blob) or 'azure' (Azure Blob)." },
       { name: 'CONTEXTNEST_BLOB_PREFIX', req: 'required', description: "Namespace prefix for Vercel Blob objects (e.g. 'vault'). Required when provider=vercel." },
       { name: 'BLOB_READ_WRITE_TOKEN', req: 'auto', description: 'Injected automatically when a Vercel Blob store is connected. Do not set manually.' },
-      { name: 'CONTEXTNEST_VAULT_PATH', req: 'optional', description: 'Local filesystem vault path. Required only when CONTEXTNEST_STORAGE=fs (local dev).' },
-      { name: 'CONTEXTNEST_DEFAULT_VAULT_ID', req: 'optional', default: 'default', description: 'Vault ID used when a request does not specify one.' },
+      { name: 'CONTEXTNEST_VAULT_PATH', req: 'optional', description: 'Local filesystem vault path. Required only when CONTEXTNEST_STORAGE=fs (local dev). Set CONTEXTNEST_VAULT_PATH_<VAULT_ID> to give each vault its own path.' },
+      { name: 'CONTEXTNEST_VAULTS', req: 'optional', description: 'Vaults this deployment serves, as comma-separated id:Label pairs (e.g. acme:Acme Corp,docs:Product Docs). The vault UI lists them in its header switcher. Unset means a single vault, CONTEXTNEST_DEFAULT_VAULT_ID.' },
+      { name: 'CONTEXTNEST_DEFAULT_VAULT_ID', req: 'optional', default: 'default', description: 'Vault ID used when a request does not specify one, and the vault /vault opens.' },
+      { name: 'CONTEXTNEST_VAULT_LABEL', req: 'optional', description: 'Display name for the vault when CONTEXTNEST_VAULTS is unset. Defaults to the title-cased vault ID.' },
+      { name: 'CONTEXTNEST_NEST_ID', req: 'optional', default: '(the vault ID)', description: "Nest ID written into uploaded image/video references (/nests/<id>/assets/<file>). Set CONTEXTNEST_NEST_ID_<VAULT_ID> to the vault's ContextNest Community nest ID so uploads made here also display there." },
     ],
   },
   {
@@ -114,6 +120,12 @@ const GROUPS: EnvGroup[] = [
       { name: 'READ_AI_SIGNING_KEY', req: 'optional', description: 'HMAC-SHA256 key used to verify the read.ai webhook signature.' },
       { name: 'BOT_GITHUB_TOKEN', req: 'optional', description: 'GitHub PAT (repo scope) the webhook bot uses to commit meeting notes (no logged-in user exists). GitHub-sync deployments only.' },
       { name: 'AI_GATEWAY_API_KEY', req: 'optional', description: 'Vercel AI Gateway key for the Claude Haiku meeting classifier. Resolved automatically from the Vercel OIDC token when deployed; set it explicitly only off-Vercel or locally.' },
+    ],
+  },
+  {
+    title: 'Instance mode',
+    vars: [
+      { name: 'PUBLIC_HOMEPAGE', req: 'optional', default: 'true', description: "Set to 'false' to hide the marketing/connection-instructions content on /, /faq, and /docs behind a sign-in prompt (using the same GitHub/Entra credential as the MCP server). Use this for a privately-deployed instance that shouldn't publicly advertise how to connect." },
     ],
   },
   {

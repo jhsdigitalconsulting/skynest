@@ -115,11 +115,13 @@ Note the **Client ID** and **Client Secret** — you'll need them in the next st
 pnpm oauth:gen-keypair
 ```
 
-This outputs `OAUTH_PRIVATE_KEY` and `OAUTH_PUBLIC_KEY` values for your environment.
+This outputs `OAUTH_JWT_PRIVATE_KEY` and `OAUTH_JWT_PUBLIC_KEY` values for your environment.
 
 ### 4. Deploy to Vercel
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jhs129/skynest)
+
+> If you're deploying from a fork, update the `repository-url` query param above to point at your own org/repo before sharing this button.
 
 Or deploy via the CLI:
 
@@ -141,8 +143,8 @@ AUTH_SECRET=<random-32-char-string>    # openssl rand -base64 32
 NEXTAUTH_URL=https://<your-vercel-app>.vercel.app
 
 # OAuth JWT signing (from step 3)
-OAUTH_PRIVATE_KEY=<generated-private-key>
-OAUTH_PUBLIC_KEY=<generated-public-key>
+OAUTH_JWT_PRIVATE_KEY=<generated-private-key>
+OAUTH_JWT_PUBLIC_KEY=<generated-public-key>
 
 # Storage backend
 CONTEXTNEST_STORAGE=blob
@@ -175,6 +177,7 @@ AUTHZ_ENTRA_READ_GROUP_ID=<group-id>[,<group-id>...]   # members get mcp:read on
 # behavior exactly as-is.
 MCP_TRUSTED_ISSUER=https://login.microsoftonline.com/<tenant-guid>/v2.0
 MCP_TRUSTED_AUDIENCE=api://<skynest-entra-app-id>   # from that app registration's "Expose an API" Identifier URI
+# (no env var needed for GitHub-mode headless agents — see "Headless agents" below)
 
 # read.ai webhook (optional — only needed if using the webhook integration)
 WEBHOOK_API_KEY=<secret-key>       # included in the webhook URL path
@@ -259,6 +262,13 @@ Reload Cursor. On first use, a browser window will open for GitHub OAuth sign-in
 
 Skynest exposes a standard MCP HTTP endpoint with OAuth 2.1. Any tool that supports MCP over HTTP with OAuth 2.1 should work — use `https://YOUR_SKYNEST_URL/api/mcp` as the endpoint.
 
+### Headless agents (no browser, no interactive login)
+
+A deployed agent that can't do the interactive GitHub OAuth flow can still call the MCP endpoint directly, using its own credential as the bearer token — no separate secret or config needed:
+
+- **`AUTH_PROVIDER=github` instances**: present a real GitHub PAT (fine-grained, scoped to the vault repo) as the bearer token. Skynest checks that PAT's actual push/pull access on `AUTHZ_GITHUB_REPO` live against the GitHub API — the same check an interactive user's token gets — and, if it has access, uses that same token to attribute and commit its own vault writes. There's nothing to configure beyond giving the agent's GitHub identity collaborator access to the repo, same as any human user.
+- **`AUTH_PROVIDER=entra` instances**: register the agent as its own Entra app (or use an existing one) and have it mint a token via the client-credentials grant, then set `MCP_TRUSTED_ISSUER`/`MCP_TRUSTED_AUDIENCE` (see above) so that token is accepted. Put the app in one of the configured `AUTHZ_ENTRA_*_GROUP_ID` groups (or grant it an app role your authorization check recognizes) for read/write access.
+
 ---
 
 ## Available MCP tools
@@ -271,6 +281,8 @@ Skynest exposes a standard MCP HTTP endpoint with OAuth 2.1. Any tool that suppo
 | `resolve` | Execute a selector query with graph traversal |
 | `read_document` | Read a document by URI or path |
 | `list_documents` | List documents with optional type/status/tag filters |
+| `get_skill` | Render a `type: skill` node as a skill file for an agent harness |
+| `get_skill_install_manifest` | Files for installing a vault skill locally (the calling agent writes them) |
 | `document_format` | Get the document format spec (call before creating docs) |
 | `read_index` | Return the context.yaml index |
 | `read_pack` | Resolve and return a context pack with documents |
@@ -296,6 +308,45 @@ Skynest exposes a standard MCP HTTP endpoint with OAuth 2.1. Any tool that suppo
 | `list_suggestions` | List all staged suggestions for a document |
 | `approve_suggestion` | Approve a suggestion: apply patch, bump version, archive |
 | `reject_suggestion` | Reject a suggestion: archive without modifying the document |
+
+---
+
+## Vault-hosted skills
+
+A vault can carry its own instructions for use. Save a `type: skill` node — `create_document`
+accepts `trigger`, `tools_required` and `output_format` — and any connected agent can fetch it
+and install a local loader in one step.
+
+**Designate an entry point** in `.context/config.yaml` so an agent with no prior knowledge can
+ask "how do I use this vault?" and get the right node. `vault_info` reports it.
+
+```yaml
+skills:
+  bootstrap: nodes/skills/vault-bootstrap
+```
+
+**Install it.** `get_skill_install_manifest` returns file contents and intended paths; the
+*calling agent* writes them, because this server is remote and has no filesystem access.
+
+```
+get_skill_install_manifest({ path: "nodes/skills/vault-bootstrap", server_alias: "skynest" })
+```
+
+Two things are worth knowing:
+
+- **`mode` defaults to `loader`.** The installed file carries the node's `skill.trigger` (as the
+  harness `description`, which is what decides whether the skill fires) plus an instruction to
+  fetch the procedure at run time — not the procedure itself. A local copy of a procedure drifts
+  the moment the node is updated, and the drift is invisible: the agent keeps working,
+  confidently, from superseded rules. `mode: "full"` inlines a snapshot for offline use and is a
+  deliberate choice.
+- **Pass `server_alias`.** The tool prefix is client-side configuration, not a server fact — the
+  same vault is `mcp__skynest__*` on one machine and `mcp__bigearnie-ctx__*` on another. It
+  defaults to the vault id. Node bodies should write `{{server_alias}}`, `{{vault_id}}` and
+  `{{node_path}}` rather than hardcoding a prefix; those are resolved per caller at render time.
+
+`get_skill` returns the same node rendered for a harness (`claude-code`, `cursor`, `codex`, or
+`raw`) without the install wrapper.
 
 ---
 
@@ -363,7 +414,7 @@ skynest/
 │   └── lib/
 │       ├── oauth/                                    # JWT signing, PKCE, token helpers
 │       ├── mcp/
-│       │   ├── tools.ts                              # Tool registration (19 tools)
+│       │   ├── tools.ts                              # Tool registration (21 tools)
 │       │   └── auth.ts                               # MCP token validation
 │       ├── vault/
 │       │   ├── index.ts                              # createEngine factory

@@ -2,11 +2,7 @@ import type { VaultSyncProvider } from './vault-sync-provider.js';
 import { GitHubVaultSyncProvider } from './providers/github-vault-sync-provider.js';
 import { AzureBlobVaultSyncProvider } from './providers/azure-blob-vault-sync-provider.js';
 import { NoopVaultSyncProvider } from './providers/noop-vault-sync-provider.js';
-
-function envForVault(key: string, vaultId: string): string | undefined {
-  const suffix = vaultId.toUpperCase().replace(/-/g, '_');
-  return process.env[`${key}_${suffix}`] ?? process.env[key];
-}
+import { envForVault } from '../registry.js';
 
 export function createVaultSyncProvider(vaultId: string = 'default'): VaultSyncProvider {
   const authProvider = process.env.AUTH_PROVIDER ?? 'github';

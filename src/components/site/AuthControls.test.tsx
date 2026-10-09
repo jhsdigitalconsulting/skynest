@@ -1,15 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-vi.mock('@/lib/auth', () => ({ auth: vi.fn(), signOut: vi.fn() }));
+vi.mock('@/lib/auth', () => ({ auth: vi.fn(), signIn: vi.fn(), signOut: vi.fn() }));
 
-import { AuthControlsView, LOGIN_HREF } from './AuthControls';
+import { AuthControlsView } from './AuthControls';
 
 describe('AuthControlsView', () => {
-  it('shows a Log in link to the sign-in page when signed out', () => {
+  it('shows a one-click Log in button (no detour through /auth/signin) when signed out', () => {
     const html = renderToStaticMarkup(<AuthControlsView />);
-    expect(html).toContain(`href="${LOGIN_HREF}"`);
+    expect(html).toContain('<form');
+    expect(html).toContain('type="submit"');
     expect(html).toContain('Log in');
+    expect(html).not.toContain('/auth/signin');
     expect(html).not.toContain('Sign out');
   });
 

@@ -1,30 +1,35 @@
 import Link from 'next/link';
+import { LOGIN_HREF } from '@/components/site/AuthControls';
 
-export function HeroSection() {
+interface Props {
+  signedIn?: boolean;
+}
+
+export function HeroSection({ signedIn = false }: Props) {
   return (
     <section className="text-center space-y-6 py-8">
-      <h1 className="text-5xl font-bold tracking-tight text-gray-900">
-        Your team&apos;s knowledge, always available
-      </h1>
-      <p className="text-xl text-gray-500 max-w-2xl mx-auto">
-        Skynest brings{' '}
-        <a
-          href="https://github.com/PromptOwl/ContextNest"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-indigo-600 hover:underline"
-        >
-          Context Nest
-        </a>{' '}
-        to the cloud — a hosted MCP server your whole team can connect to from any AI tool,
-        anywhere, without running anything locally.
+      <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
+        Orlando Health MarTech
       </p>
-      <Link
-        href="/faq"
-        className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
-      >
-        Get connected →
-      </Link>
+      <h1 className="text-5xl font-bold tracking-tight text-gray-900">Context Hub</h1>
+      <p className="text-xl text-gray-500 max-w-2xl mx-auto">
+        The team&apos;s shared knowledge vault, available to Claude, Cursor, and your other AI
+        tools through one secure connection.
+      </p>
+      <div className="flex items-center justify-center gap-4">
+        <Link
+          href={signedIn ? '/vault' : LOGIN_HREF}
+          className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+        >
+          {signedIn ? 'Open vault →' : 'Log in →'}
+        </Link>
+        <Link
+          href="/docs"
+          className="inline-block border border-gray-300 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+        >
+          Connect your AI tool
+        </Link>
+      </div>
     </section>
   );
 }

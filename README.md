@@ -10,6 +10,7 @@ Skynest brings [Context Nest](https://github.com/PromptOwl/ContextNest) to the c
 
 ## What is Skynest?
 
+
 ### Built on Context Nest
 
 [Context Nest](https://github.com/PromptOwl/ContextNest) (by [PromptOwl](https://promptowl.ai)) is a structured knowledge vault for AI tools. Rather than dumping raw files at an AI, it organizes information as interconnected documents — nodes with graph relationships, pack bundles, semantic indexing, and full version history — purpose-built for AI consumption. Teams use it to share meeting notes, project decisions, architectural context, and reference documentation directly with Claude, Cursor, and other AI tools through the Model Context Protocol (MCP).

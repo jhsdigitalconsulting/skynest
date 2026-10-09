@@ -1,1 +1,101 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+/* Diff and editor surfaces read better with tabular figures and no ligatures. */
+.diff-table,
+.editor-textarea {
+  font-variant-ligatures: none;
+  tab-size: 2;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+dialog.vault-dialog::backdrop {
+  background: rgb(17 24 39 / 0.4);
+  backdrop-filter: blur(2px);
+}
+
+/* Visual (WYSIWYG) editor: the bits prose doesn't cover. */
+.visual-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--color-gray-400);
+}
+.visual-editor ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.25em;
+}
+.visual-editor ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+  padding-left: 0;
+}
+.visual-editor ul[data-type="taskList"] li > label {
+  flex: none;
+  margin-top: 0.3em;
+  user-select: none;
+}
+.visual-editor ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+.visual-editor ul[data-type="taskList"] li > div > p {
+  margin: 0;
+}
+.visual-editor table {
+  table-layout: fixed;
+  overflow: hidden;
+}
+.visual-editor td,
+.visual-editor th {
+  position: relative;
+  border: 1px solid var(--color-gray-200);
+  padding: 0.375em 0.625em;
+  vertical-align: top;
+}
+.visual-editor .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgb(99 102 241 / 0.12);
+  pointer-events: none;
+}
+.visual-editor .tableWrapper {
+  overflow-x: auto;
+}
+/* Links to documents in the vault get a document icon, to tell them from web links. */
+.visual-editor a[href^="contextnest://"]::before {
+  content: "";
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 0.2em;
+  vertical-align: -0.05em;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.visual-editor img {
+  display: inline-block;
+  max-width: 100%;
+}
+.visual-editor img.ProseMirror-selectednode {
+  outline: 2px solid var(--color-indigo-500);
+}
+/* The player under a paragraph holding a video's URL (see videoPreviews). */
+.visual-editor video.video-preview {
+  display: block;
+  max-width: 100%;
+  margin: -0.5em 0 1.25em;
+  border-radius: 0.5rem;
+}

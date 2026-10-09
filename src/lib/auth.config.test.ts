@@ -13,6 +13,25 @@ async function loadAuthConfig() {
   return authConfig;
 }
 
+/** The mocked providers are plain objects, so read their fields directly. */
+interface MockProvider {
+  id: string;
+  issuer?: string;
+}
+
+async function loadProviders(): Promise<MockProvider[]> {
+  const authConfig = await loadAuthConfig();
+  return authConfig.providers as unknown as MockProvider[];
+}
+
+/** Runs the jwt callback and asserts it returned a token. */
+async function runJwt(params: unknown) {
+  const authConfig = await loadAuthConfig();
+  const token = await authConfig.callbacks!.jwt!(params as never);
+  if (!token) throw new Error('jwt callback returned no token');
+  return token;
+}
+
 describe('authConfig provider selection', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -25,9 +44,9 @@ describe('authConfig provider selection', () => {
   });
 
   it('defaults to a single GitHub provider when AUTH_PROVIDER is unset', async () => {
-    const authConfig = await loadAuthConfig();
-    expect(authConfig.providers).toHaveLength(1);
-    expect(authConfig.providers[0].id).toBe('github');
+    const providers = await loadProviders();
+    expect(providers).toHaveLength(1);
+    expect(providers[0].id).toBe('github');
   });
 
   it('uses a single Microsoft Entra ID provider when AUTH_PROVIDER=entra', async () => {
@@ -36,10 +55,10 @@ describe('authConfig provider selection', () => {
     process.env.ENTRA_CLIENT_ID = 'entra-client-id';
     process.env.ENTRA_CLIENT_SECRET = 'entra-client-secret';
 
-    const authConfig = await loadAuthConfig();
-    expect(authConfig.providers).toHaveLength(1);
-    expect(authConfig.providers[0].id).toBe('microsoft-entra-id');
-    expect(authConfig.providers[0].issuer).toBe(
+    const providers = await loadProviders();
+    expect(providers).toHaveLength(1);
+    expect(providers[0].id).toBe('microsoft-entra-id');
+    expect(providers[0].issuer).toBe(
       'https://login.microsoftonline.com/test-tenant/v2.0'
     );
   });
@@ -61,53 +80,48 @@ describe('authConfig callbacks', () => {
   });
 
   it('jwt callback carries a GitHub access token and login into idpAccessToken/idpLogin', async () => {
-    const authConfig = await loadAuthConfig();
-    const token = await authConfig.callbacks!.jwt!({
+    const token = await runJwt({
       token: { name: 'Fallback Name' },
       account: { provider: 'github', access_token: 'ghp_abc', login: 'octocat' } as never,
-    } as never);
+    });
     expect(token.idpAccessToken).toBe('ghp_abc');
     expect(token.idpLogin).toBe('octocat');
   });
 
   it('jwt callback carries an Entra ID access token and sources idpLogin from preferred_username', async () => {
-    const authConfig = await loadAuthConfig();
-    const token = await authConfig.callbacks!.jwt!({
+    const token = await runJwt({
       token: { name: 'Fallback Name' },
       account: { provider: 'microsoft-entra-id', access_token: 'entra_at_abc' } as never,
       profile: { preferred_username: 'jane@contoso.com', email: 'jane@other.com' } as never,
-    } as never);
+    });
     expect(token.idpAccessToken).toBe('entra_at_abc');
     expect(token.idpLogin).toBe('jane@contoso.com');
   });
 
   it('jwt callback copies profile.groups into idpGroups when present', async () => {
-    const authConfig = await loadAuthConfig();
-    const token = await authConfig.callbacks!.jwt!({
+    const token = await runJwt({
       token: { name: 'Fallback Name' },
       account: { provider: 'microsoft-entra-id', access_token: 'entra_at_abc' } as never,
       profile: { preferred_username: 'jane@contoso.com', groups: ['group-a', 'group-b'] } as never,
-    } as never);
+    });
     expect(token.idpGroups).toEqual(['group-a', 'group-b']);
   });
 
   it('jwt callback leaves idpGroups undefined when the profile has no groups claim', async () => {
-    const authConfig = await loadAuthConfig();
-    const token = await authConfig.callbacks!.jwt!({
+    const token = await runJwt({
       token: { name: 'Fallback Name' },
       account: { provider: 'microsoft-entra-id', access_token: 'entra_at_abc' } as never,
       profile: { preferred_username: 'jane@contoso.com' } as never,
-    } as never);
+    });
     expect(token.idpGroups).toBeUndefined();
   });
 
   it('jwt callback falls back to email when Entra ID profile has no preferred_username', async () => {
-    const authConfig = await loadAuthConfig();
-    const token = await authConfig.callbacks!.jwt!({
+    const token = await runJwt({
       token: { name: 'Fallback Name' },
       account: { provider: 'microsoft-entra-id' } as never,
       profile: { email: 'jane@other.com' } as never,
-    } as never);
+    });
     expect(token.idpLogin).toBe('jane@other.com');
   });
 

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Section, InlineCode } from './shared';
 
 const READ_TOOLS = [
@@ -5,6 +6,8 @@ const READ_TOOLS = [
   { name: 'resolve', description: "Execute a selector query with graph traversal (e.g. '#engineering + type:document')" },
   { name: 'read_document', description: "Read a document by URI (contextnest://nodes/foo) or path (nodes/foo)" },
   { name: 'list_documents', description: 'List documents with optional type, status, and tag filters' },
+  { name: 'get_skill', description: "Render a type: skill node as a skill file for an agent harness — description derived from the node's skill.trigger" },
+  { name: 'get_skill_install_manifest', description: 'Return the files for installing a vault skill locally. The calling agent writes them — this server has no filesystem access. Defaults to a fetch-at-runtime loader.' },
   { name: 'document_format', description: 'Get the document format spec and frontmatter fields — call before creating docs' },
   { name: 'read_index', description: 'Return the context.yaml document graph index' },
   { name: 'read_pack', description: 'Resolve and return a context pack with documents and agent instructions' },
@@ -26,6 +29,19 @@ const GOVERNANCE_TOOLS = [
   { name: 'list_suggestions', description: 'List all staged suggestions for a document' },
   { name: 'approve_suggestion', description: 'Approve a suggestion: apply the patch, bump version, archive the suggestion' },
   { name: 'reject_suggestion', description: 'Reject a suggestion: archive without modifying the canonical document' },
+];
+
+const REVIEW_TOOLS = [
+  { name: 'save_draft', description: 'Save proposed changes as a draft without publishing. Starts a new document when the path does not exist; pass submit: true to submit in the same call.' },
+  { name: 'read_draft', description: "Read a document's pending draft: proposed content, status, revision and review thread" },
+  { name: 'list_drafts', description: 'List pending drafts, optionally by status or only the ones you are involved in' },
+  { name: 'list_review_queue', description: 'Every draft waiting for review, oldest first, plus whether you can approve (optionally with drift suggestions)' },
+  { name: 'submit_draft', description: 'Submit a draft for review, or resubmit after changes were requested' },
+  { name: 'withdraw_draft', description: 'Pull a submitted draft back out of review' },
+  { name: 'comment_on_draft', description: "Add a comment to a draft's review thread" },
+  { name: 'request_changes', description: 'Reviewer only: send a submitted draft back with feedback' },
+  { name: 'approve_draft', description: 'Reviewer only: publish a submitted draft. Pass expected_revision to refuse if the draft was edited after you reviewed it; refuses if the document changed since the draft started unless force: true.' },
+  { name: 'discard_draft', description: 'Delete a draft without publishing it' },
 ];
 
 function ToolTable({ tools }: { tools: { name: string; description: string }[] }) {
@@ -90,6 +106,18 @@ export function DocsMcpTools() {
             breaking the hash chain.
           </p>
           <ToolTable tools={GOVERNANCE_TOOLS} />
+        </div>
+
+        <div className="space-y-2">
+          <h3 className="text-base font-medium text-gray-800">Draft &amp; review tools</h3>
+          <p className="text-sm text-gray-500">
+            Propose changes without publishing them. Drafts appear in the{' '}
+            <Link href="/vault" className="text-indigo-600 hover:underline">vault</Link>’s review queue, where
+            reviewers approve them or send them back. With{' '}
+            <InlineCode>CONTEXTNEST_REQUIRE_REVIEW=true</InlineCode>, direct writes from non-reviewers are
+            turned into drafts automatically.
+          </p>
+          <ToolTable tools={REVIEW_TOOLS} />
         </div>
 
         <div className="rounded-lg bg-gray-50 border border-gray-200 p-4 text-sm text-gray-600 space-y-2">

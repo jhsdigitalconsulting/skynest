@@ -13,7 +13,7 @@ const VALID_PAYLOAD = {
   report_url: 'https://app.read.ai/analytics/meetings/abc123',
   participants: [
     { name: 'Jane Smith', first_name: 'Jane', last_name: 'Smith', email: 'jane@acme.com' },
-    { name: 'John Schneider', first_name: 'John', last_name: 'Schneider', email: null },
+    { name: 'Alex Rivera', first_name: 'John', last_name: 'Schneider', email: null },
   ],
   topics: [{ text: 'quarterly review' }, { text: 'roadmap' }],
   action_items: [{ text: 'Follow up on contract renewal by June 30' }],
@@ -131,12 +131,12 @@ import { MeetingAnalysisSchema } from './schema';
 describe('MeetingAnalysisSchema', () => {
   it('accepts a full analysis with sub-client and project', () => {
     const parsed = MeetingAnalysisSchema.safeParse({
-      billing_client: { name: 'Laughlin Constable', slug: 'laughlin-constable' },
-      end_client: { name: 'ALZ.org', slug: 'alz-org' },
-      project: { code: 'LCALZ', name: 'ALZ RFP' },
+      billing_client: { name: 'Blackwood Partners', slug: 'blackwood-partners' },
+      end_client: { name: 'Riverside.org', slug: 'riverside-org' },
+      project: { code: 'BWRIV', name: 'Riverside RFP' },
       confidence: 'high',
       topics_canonical: ['proposal'],
-      topics_freeform: ['alz-org'],
+      topics_freeform: ['riverside-org'],
       summary: 'Pitch prep.',
       action_items: ['Finalize deck'],
     });
@@ -145,7 +145,7 @@ describe('MeetingAnalysisSchema', () => {
 
   it('accepts null end_client and null project', () => {
     const parsed = MeetingAnalysisSchema.safeParse({
-      billing_client: { name: 'Orlando Health', slug: 'orlando-health' },
+      billing_client: { name: 'Acme Corp', slug: 'orlando-health' },
       end_client: null,
       project: null,
       confidence: 'medium',

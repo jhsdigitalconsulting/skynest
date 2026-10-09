@@ -2,14 +2,9 @@ import { BlobStorageProvider } from './blob-storage-provider.js';
 import { AzureBlobStorageProvider } from './azure-blob-storage-provider.js';
 import { FsStorageProvider } from '@promptowl/contextnest-engine';
 import type { StorageProvider } from '@promptowl/contextnest-engine';
+import { envForVault, validateVaultId } from '../registry.js';
 
-const VAULT_ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
-
-export function validateVaultId(id: string): void {
-  if (!VAULT_ID_RE.test(id)) {
-    throw new Error(`Invalid vaultId "${id}" — must match ${VAULT_ID_RE}`);
-  }
-}
+export { validateVaultId };
 
 export function createStorageProvider(vaultId?: string): StorageProvider {
   const storage = process.env.CONTEXTNEST_STORAGE ?? 'blob';
@@ -36,7 +31,10 @@ export function createStorageProvider(vaultId?: string): StorageProvider {
   }
 
   if (storage === 'fs') {
-    const vaultPath = process.env.CONTEXTNEST_VAULT_PATH;
+    // Each vault can point at its own folder via CONTEXTNEST_VAULT_PATH_<VAULT_ID>.
+    const resolvedVaultId = vaultId ?? process.env.CONTEXTNEST_DEFAULT_VAULT_ID ?? 'default';
+    validateVaultId(resolvedVaultId);
+    const vaultPath = envForVault('CONTEXTNEST_VAULT_PATH', resolvedVaultId);
     if (!vaultPath) throw new Error('CONTEXTNEST_VAULT_PATH env var is required when CONTEXTNEST_STORAGE=fs');
     return new FsStorageProvider(vaultPath);
   }

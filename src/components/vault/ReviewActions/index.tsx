@@ -6,6 +6,8 @@ import { ReviewerPanel } from './ReviewerPanel';
 export interface ReviewActionsProps {
   docId: string;
   status: DraftStatus;
+  /** The draft revision on screen, so an approval publishes exactly what was reviewed. */
+  revision: number;
   canWrite: boolean;
   isReviewer: boolean;
   canManage: boolean;
@@ -23,7 +25,7 @@ const HEADLINE: Record<DraftStatus, { title: string; body: string }> = {
 
 /** The action card on the review page — what this viewer can do with the draft right now. */
 export function ReviewActions(props: ReviewActionsProps) {
-  const { docId, status, canWrite, isReviewer, canManage, staleReason } = props;
+  const { docId, status, revision, canWrite, isReviewer, canManage, staleReason } = props;
   const headline = HEADLINE[status];
   const reviewing = isReviewer && status === 'in_review';
   const canEdit = canWrite && (status !== 'in_review' || canManage);
@@ -42,7 +44,7 @@ export function ReviewActions(props: ReviewActionsProps) {
 
       {canWrite ? (
         <div className="mt-4 space-y-2">
-          {reviewing && <ReviewerPanel docId={docId} staleReason={staleReason} />}
+          {reviewing && <ReviewerPanel docId={docId} revision={revision} staleReason={staleReason} />}
           {(canManage || canEdit) && (
             <div className={reviewing ? 'border-t border-gray-100 pt-2' : ''}>
               <AuthorPanel docId={docId} status={status} canManage={canManage} canEdit={canEdit} />

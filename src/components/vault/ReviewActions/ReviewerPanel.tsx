@@ -10,12 +10,13 @@ import { useVaultId } from '../useVault';
 
 interface Props {
   docId: string;
+  revision: number;
   /** Explanation when the live document has moved on since the draft started. */
   staleReason: string | null;
 }
 
 /** Approve / request changes, for reviewers looking at a draft in review. */
-export function ReviewerPanel({ docId, staleReason }: Props) {
+export function ReviewerPanel({ docId, revision, staleReason }: Props) {
   const { run, pending } = useVaultAction();
   const vaultId = useVaultId();
   const [dialog, setDialog] = useState<'approve' | 'changes' | null>(null);
@@ -78,7 +79,7 @@ export function ReviewerPanel({ docId, staleReason }: Props) {
           ) : null
         }
         onClose={close}
-        onConfirm={(note) => run(() => approveAction(vaultId, docId, { note: note || undefined, force }), (r) => r.ok && close())}
+        onConfirm={(note) => run(() => approveAction(vaultId, docId, { note: note || undefined, force, expectedRevision: revision }), (r) => r.ok && close())}
       />
       <NoteDialog
         open={dialog === 'changes'}

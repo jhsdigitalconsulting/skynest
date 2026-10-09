@@ -327,8 +327,15 @@ export function registerReviewTools(tool: ToolRegistrar): void {
         .boolean()
         .optional()
         .describe('Publish even if the document was published again after the draft was started'),
+      expected_revision: z
+        .number()
+        .int()
+        .optional()
+        .describe(
+          'The draft `revision` you reviewed (from read_draft). Approval is refused if the draft was edited since. Strongly recommended.',
+        ),
     },
-    async ({ path, note, force }, ctx) => {
+    async ({ path, note, force, expected_revision }, ctx) => {
       const permErr = requireWriteScope(ctx.authInfo);
       if (permErr) return permErr;
       const extra = getExtra(ctx.authInfo);
@@ -337,7 +344,7 @@ export function registerReviewTools(tool: ToolRegistrar): void {
         const result = await approveDraft(
           { storage, sync, userToken, actor: actorFrom(ctx.authInfo) },
           path,
-          { note, force },
+          { note, force, expectedRevision: expected_revision },
         );
         return jsonResult({
           id: result.node.id,

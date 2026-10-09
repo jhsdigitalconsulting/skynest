@@ -175,6 +175,7 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
           <ReviewActions
             docId={docId}
             status={draft.status}
+            revision={draft.revision}
             canWrite={canWrite}
             isReviewer={viewer.isReviewer}
             canManage={canManage}

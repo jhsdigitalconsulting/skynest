@@ -40,7 +40,7 @@ const REVIEW_TOOLS = [
   { name: 'withdraw_draft', description: 'Pull a submitted draft back out of review' },
   { name: 'comment_on_draft', description: "Add a comment to a draft's review thread" },
   { name: 'request_changes', description: 'Reviewer only: send a submitted draft back with feedback' },
-  { name: 'approve_draft', description: 'Reviewer only: publish a submitted draft. Refuses if the document changed since the draft started unless force: true.' },
+  { name: 'approve_draft', description: 'Reviewer only: publish a submitted draft. Pass expected_revision to refuse if the draft was edited after you reviewed it; refuses if the document changed since the draft started unless force: true.' },
   { name: 'discard_draft', description: 'Delete a draft without publishing it' },
 ];
 

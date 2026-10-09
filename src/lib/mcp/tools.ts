@@ -1154,6 +1154,9 @@ export function registerTools(server: McpServer): void {
     async ({ path, suggestion_id, actor, comment }, ctx) => {
       const permErr = requireWriteScope(ctx.authInfo);
       if (permErr) return permErr;
+      // Approving a suggestion publishes a new version, so it's reviewer-only under required review.
+      const reviewErr = requireReviewerForDirectWrite(ctx.authInfo);
+      if (reviewErr) return reviewErr;
 
       const extra = getExtra(ctx.authInfo);
       const { storage, sync, userToken } = createEngine(extra.userToken, extra.vaultId);

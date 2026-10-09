@@ -137,7 +137,20 @@ describe('editing an existing document', () => {
     expect(forced.version).toBe(3);
   });
 
-  it('detects concurrent saves via revision', async () => {
+  it('refuses to approve a draft edited after the reviewer opened it', async () => {
+    await seed();
+    const draft = await saveDraft({ storage, actor: author }, { docId: 'nodes/api', changes: { body: 'reviewed' }, submit: true });
+    await saveDraft({ storage, actor: author }, { docId: 'nodes/api', changes: { body: 'sneaky' } });
+    expect(
+      await code(approveDraft(publishCtx(reviewer), 'nodes/api', { expectedRevision: draft.revision })),
+    ).toBe('conflict');
+    expect((await storage.readDocument('nodes/api')).body).not.toContain('sneaky');
+    const latest = await getDraft(storage, 'nodes/api');
+    await approveDraft(publishCtx(reviewer), 'nodes/api', { expectedRevision: latest!.revision });
+    expect((await storage.readDocument('nodes/api')).body).toContain('sneaky');
+  });
+
+    it('detects concurrent saves via revision', async () => {
     await seed();
     const first = await saveDraft({ storage, actor: author }, { docId: 'nodes/api', changes: { body: 'a' } });
     await saveDraft({ storage, actor: reviewer }, { docId: 'nodes/api', changes: { body: 'b' }, expectedRevision: first.revision });

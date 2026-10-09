@@ -439,6 +439,11 @@ export interface ApproveOptions {
   note?: string;
   /** Publish even though the live document has moved past the draft's base version. */
   force?: boolean;
+  /**
+   * The draft revision the reviewer looked at. When given, approval refuses if
+   * the draft has been edited since, so what gets published is what was reviewed.
+   */
+  expectedRevision?: number;
 }
 
 export interface ApproveResult {
@@ -468,6 +473,13 @@ export async function approveDraft(
     throw new ReviewError(
       'Only a draft that has been submitted for review can be approved.',
       'invalid_state',
+    );
+  }
+  if (options.expectedRevision !== undefined && draft.revision !== options.expectedRevision) {
+    throw new ReviewError(
+      `This draft was edited after you opened it (revision ${draft.revision}, you reviewed ${options.expectedRevision}). Reload and review the latest changes before approving.`,
+      'conflict',
+      { currentRevision: draft.revision },
     );
   }
 

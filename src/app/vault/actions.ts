@@ -178,7 +178,7 @@ export async function requestChangesAction(vaultId: string, docId: string, messa
 export async function approveAction(
   vaultId: string,
   docId: string,
-  options: { note?: string; force?: boolean } = {},
+  options: { note?: string; force?: boolean; expectedRevision?: number } = {},
 ): Promise<ActionResult> {
   return run(async () => {
     const viewer = await requireWriter();

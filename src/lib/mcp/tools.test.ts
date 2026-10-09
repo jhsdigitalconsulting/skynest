@@ -1660,9 +1660,9 @@ describe('registerTools', () => {
       process.env = { ...saved };
     });
 
-    for (const name of ['publish_document', 'delete_document']) {
+    for (const name of ['publish_document', 'delete_document', 'approve_suggestion']) {
       it(`${name} is reviewer-only`, async () => {
-        const { data, isError } = await callJson(name, { path: 'nodes/x' });
+        const { data, isError } = await callJson(name, { path: 'nodes/x', suggestion_id: 's1' });
         expect(isError).toBe(true);
         expect(data.error).toMatch(/only reviewers/);
         expect(mockStorage.deleteDocument).not.toHaveBeenCalled();

@@ -8,7 +8,7 @@
  *  - Assert storage / engine methods were called and result shape is correct
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mock: vault engine ──────────────────────────────────────────────────────
 
@@ -1596,13 +1596,13 @@ describe('registerTools', () => {
   });
 
   describe('tool registration count', () => {
-    it('registers all 21 tools', async () => {
+    it('registers all 31 tools', async () => {
       const { server, tools } = makeServerStub();
       const { registerTools } = await import('./tools.js');
       // @ts-expect-error — stub
       registerTools(server);
 
-      expect(tools.size).toBe(21);
+      expect(tools.size).toBe(31);
     });
 
     it('registers the expected tool names', async () => {
@@ -1633,10 +1633,52 @@ describe('registerTools', () => {
         'list_suggestions',
         'approve_suggestion',
         'reject_suggestion',
+        'save_draft',
+        'read_draft',
+        'list_drafts',
+        'list_review_queue',
+        'submit_draft',
+        'withdraw_draft',
+        'comment_on_draft',
+        'request_changes',
+        'approve_draft',
+        'discard_draft',
       ];
       for (const name of expected) {
         expect(tools.has(name), `Expected tool "${name}" to be registered`).toBe(true);
       }
+    });
+  });
+
+  describe('required review (CONTEXTNEST_REQUIRE_REVIEW)', () => {
+    const saved = { ...process.env };
+    beforeEach(() => {
+      process.env.CONTEXTNEST_REQUIRE_REVIEW = 'true';
+      process.env.AUTHZ_REVIEWERS = 'rita';
+    });
+    afterEach(() => {
+      process.env = { ...saved };
+    });
+
+    for (const name of ['publish_document', 'delete_document', 'approve_suggestion']) {
+      it(`${name} is reviewer-only`, async () => {
+        const { data, isError } = await callJson(name, { path: 'nodes/x', suggestion_id: 's1' });
+        expect(isError).toBe(true);
+        expect(data.error).toMatch(/only reviewers/);
+        expect(mockStorage.deleteDocument).not.toHaveBeenCalled();
+      });
+    }
+
+    it('lets a listed reviewer publish directly', async () => {
+      const { publishDocument } = await import('@promptowl/contextnest-engine');
+      vi.mocked(publishDocument).mockResolvedValue({
+        node: { id: 'nodes/x', frontmatter: { title: 'X', version: 2 } },
+        versionEntry: { chain_hash: 'h' },
+        checkpointNumber: 1,
+      } as never);
+      mockStorage.readDocument.mockResolvedValue({ id: 'nodes/x', frontmatter: { title: 'X' }, body: '' });
+      const { isError } = await callJson('publish_document', { path: 'nodes/x' }, makeCtx('t', 'Rita'));
+      expect(isError).toBe(false);
     });
   });
 });

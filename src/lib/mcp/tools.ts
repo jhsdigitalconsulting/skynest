@@ -41,6 +41,7 @@ import {
   errorResult,
   makeToolRegistrar,
 } from './tool-helpers';
+import { registerGitSyncTool } from './git-sync-tools';
 import { registerReviewTools, routeWriteToReview, requireReviewerForDirectWrite } from './review-tools';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1241,4 +1242,5 @@ export function registerTools(server: McpServer): void {
   );
 
   registerReviewTools(tool);
+  registerGitSyncTool(tool);
 }

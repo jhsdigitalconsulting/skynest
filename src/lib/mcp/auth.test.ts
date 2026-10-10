@@ -274,6 +274,117 @@ describe('verifyMcpToken with a trusted external issuer', () => {
   });
 });
 
+describe('verifyMcpToken with a raw GitHub PAT (headless-agent passthrough)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    vi.resetModules();
+    delete process.env.AUTH_PROVIDER; // defaults to 'github'
+    fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.clearAllMocks();
+  });
+
+  it('accepts a real GitHub PAT with push access, and passes the same token through for attribution', async () => {
+    const checkAccess = vi.fn(async () => 'write');
+    vi.doMock('@/lib/authorization/authorization-factory', () => ({
+      createAuthorizationProvider: () => ({ checkAccess }),
+    }));
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ login: 'skynest-agent' }),
+    });
+
+    const { verifyMcpToken } = await import('./auth.js');
+    const result = await verifyMcpToken('ghp_realtoken123', 'https://example.com/api/mcp');
+
+    expect(checkAccess).toHaveBeenCalledWith({ idpAccessToken: 'ghp_realtoken123' });
+    expect(result?.clientId).toBe('skynest-agent');
+    expect(result?.scopes).toEqual(['mcp:read', 'mcp:write']);
+    expect(result?.extra).toMatchObject({
+      userToken: 'ghp_realtoken123',
+      userLogin: 'skynest-agent',
+    });
+  });
+
+  it('grants read-only scopes for a PAT with only pull access', async () => {
+    vi.doMock('@/lib/authorization/authorization-factory', () => ({
+      createAuthorizationProvider: () => ({ checkAccess: vi.fn(async () => 'read') }),
+    }));
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ login: 'read-only-bot' }) });
+
+    const { verifyMcpToken } = await import('./auth.js');
+    const result = await verifyMcpToken('ghp_readonly', 'https://example.com/api/mcp');
+
+    expect(result?.scopes).toEqual(['mcp:read']);
+  });
+
+  it('falls through to existing JWT verification (and rejects) when GitHub reports no access', async () => {
+    vi.doMock('@/lib/authorization/authorization-factory', () => ({
+      createAuthorizationProvider: () => ({ checkAccess: vi.fn(async () => 'none') }),
+    }));
+
+    const { verifyMcpToken } = await import('./auth.js');
+    await expect(verifyMcpToken('ghp_no_access', 'https://example.com/api/mcp')).rejects.toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('falls through to existing JWT verification (and rejects) when GET /user fails', async () => {
+    vi.doMock('@/lib/authorization/authorization-factory', () => ({
+      createAuthorizationProvider: () => ({ checkAccess: vi.fn(async () => 'write') }),
+    }));
+    fetchMock.mockResolvedValue({ ok: false, json: async () => ({}) });
+
+    const { verifyMcpToken } = await import('./auth.js');
+    await expect(verifyMcpToken('ghp_bad_lookup', 'https://example.com/api/mcp')).rejects.toThrow();
+  });
+
+  it('never attempts PAT passthrough for a JWT-shaped token, and does not call GitHub', async () => {
+    const checkAccess = vi.fn();
+    vi.doMock('@/lib/authorization/authorization-factory', () => ({
+      createAuthorizationProvider: () => ({ checkAccess }),
+    }));
+    const { getPublicKey } = await import('@/lib/oauth/keys');
+    vi.mocked(getPublicKey).mockClear();
+
+    const { SignJWT, generateKeyPair } = await import('jose');
+    const { privateKey, publicKey } = await generateKeyPair('RS256');
+    vi.mocked(getPublicKey).mockResolvedValue(publicKey);
+    const token = await new SignJWT({ sub: 'u', client_id: 'c', scope: 'mcp:read' })
+      .setProtectedHeader({ alg: 'RS256' })
+      .setAudience('https://example.com/api/mcp')
+      .setIssuedAt()
+      .setExpirationTime('8h')
+      .sign(privateKey);
+
+    const { verifyMcpToken } = await import('./auth.js');
+    await verifyMcpToken(token, 'https://example.com/api/mcp');
+
+    expect(checkAccess).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not attempt PAT passthrough when AUTH_PROVIDER=entra', async () => {
+    process.env.AUTH_PROVIDER = 'entra';
+    const checkAccess = vi.fn();
+    vi.doMock('@/lib/authorization/authorization-factory', () => ({
+      createAuthorizationProvider: () => ({ checkAccess }),
+    }));
+
+    const { verifyMcpToken } = await import('./auth.js');
+    await expect(verifyMcpToken('ghp_realtoken123', 'https://example.com/api/mcp')).rejects.toThrow();
+
+    expect(checkAccess).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    delete process.env.AUTH_PROVIDER;
+  });
+});
+
 describe('verifyMcpToken routing when MCP_TRUSTED_ISSUER is unset', () => {
   it('still verifies self-issued tokens exactly as before (regression guard)', async () => {
     vi.resetModules();

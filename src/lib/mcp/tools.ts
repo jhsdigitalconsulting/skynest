@@ -15,45 +15,36 @@ import {
   parseUri,
 } from '@promptowl/contextnest-engine';
 import type { Frontmatter, RbacHook } from '@promptowl/contextnest-engine';
+import {
+  NODE_TYPES,
+  SKILL_OUTPUT_FORMATS,
+  applyTypedBlocks,
+  sourceBlockSchema,
+} from './typed-blocks';
 import { createEngine } from '@/lib/vault/index';
-import type { McpExtra } from './auth';
+import { readSkillsConfig } from '@/lib/vault/skills-config';
+import {
+  HARNESSES,
+  INSTALL_SCOPES,
+  INSTALL_MODES,
+  NotASkillNodeError,
+  buildInstallManifest,
+  renderSkill,
+} from './skills';
+
+import {
+  jsonResult,
+  textResult,
+  getExtra,
+  requireWriteScope,
+  resolveVaultId,
+  errorResult,
+  makeToolRegistrar,
+} from './tool-helpers';
+import { registerGitSyncTool } from './git-sync-tools';
+import { registerReviewTools, routeWriteToReview, requireReviewerForDirectWrite } from './review-tools';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function jsonResult(data: unknown) {
-  return {
-    content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
-  };
-}
-
-function textResult(text: string) {
-  return { content: [{ type: 'text' as const, text }] };
-}
-
-function getExtra(authInfo: unknown): McpExtra {
-  return (authInfo as { extra: McpExtra }).extra;
-}
-
-function requireWriteScope(
-  authInfo: unknown,
-): { content: [{ type: 'text'; text: string }]; isError: true } | null {
-  const scopes: string[] = (authInfo as { scopes?: string[] })?.scopes ?? [];
-  if (!scopes.includes('mcp:write')) {
-    return {
-      content: [
-        {
-          type: 'text' as const,
-          text: JSON.stringify({
-            error:
-              'Insufficient permissions: this account has read-only access to this vault. Write access is required.',
-          }),
-        },
-      ],
-      isError: true,
-    };
-  }
-  return null;
-}
 
 /**
  * Permissive RBAC for hosted single-tenant context — the actor identity is
@@ -67,11 +58,35 @@ const permissiveRbac: RbacHook = {
   isDocOwner: () => true,
 };
 
+/**
+ * Resolve the body of a write call from the two accepted parameter names.
+ *
+ * Both write tools call it `body`, but `content` is the name most content APIs
+ * use, so callers reach for it often enough that accepting both spellings is
+ * cheaper than rejecting one. Both spellings carrying *different* text is a
+ * caller bug we cannot resolve on their behalf, so that fails.
+ */
+function resolveBodyArg(
+  body: string | undefined,
+  content: string | undefined,
+): { ok: true; body: string | undefined } | { ok: false; error: string } {
+  if (body !== undefined && content !== undefined && body !== content) {
+    return {
+      ok: false,
+      error:
+        'Both `body` and `content` were provided with different text. They are aliases for the same field — pass only one.',
+    };
+  }
+  return { ok: true, body: body ?? content };
+}
+
 // ─── Tool registration ────────────────────────────────────────────────────────
 
 export function registerTools(server: McpServer): void {
+  const tool = makeToolRegistrar(server);
+
   // ── vault_info ─────────────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'vault_info',
     'Get vault identity (CONTEXT.md) and configuration summary',
     {},
@@ -80,6 +95,7 @@ export function registerTools(server: McpServer): void {
       const { storage } = createEngine(extra.userToken, extra.vaultId);
       const contextMd = await storage.readContextMd();
       const config = await storage.readConfig();
+      const skillsConfig = await readSkillsConfig(storage);
       return jsonResult({
         context_md: contextMd ?? '(no CONTEXT.md found)',
         config: config
@@ -89,12 +105,19 @@ export function registerTools(server: McpServer): void {
               servers: config.servers ? Object.keys(config.servers) : [],
             }
           : null,
+        vault_id: resolveVaultId(extra),
+        skills: {
+          bootstrap: skillsConfig?.bootstrap ?? null,
+          hint: skillsConfig?.bootstrap
+            ? `This vault designates "${skillsConfig.bootstrap}" as its entry-point skill — how an agent is meant to work with this vault. Read it with get_skill({ path: "${skillsConfig.bootstrap}" }).`
+            : 'This vault designates no entry-point skill. Set skills.bootstrap in .context/config.yaml, or browse what exists with list_documents({ type: "skill" }).',
+        },
       });
     },
   );
 
   // ── resolve ────────────────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'resolve',
     'Execute a selector query to find matching documents using graph traversal',
     {
@@ -143,7 +166,7 @@ export function registerTools(server: McpServer): void {
   );
 
   // ── read_document ──────────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'read_document',
     "Read a single document by its contextnest:// URI or path",
     {
@@ -169,18 +192,30 @@ export function registerTools(server: McpServer): void {
   );
 
   // ── list_documents ─────────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'list_documents',
     'List all documents with optional filters',
     {
+      path: z
+        .string()
+        .optional()
+        .describe(
+          "Filter by folder path, e.g. 'nodes/history' — matches that document and everything beneath it. Matching is on whole path segments, so 'nodes/hist' does not match 'nodes/history'.",
+        ),
       type: z.string().optional().describe('Filter by node type'),
       status: z.string().optional().describe('Filter by status (draft/published)'),
       tag: z.string().optional().describe('Filter by tag'),
     },
-    async ({ type, status, tag }, ctx) => {
+    async ({ path, type, status, tag }, ctx) => {
       const extra = getExtra(ctx.authInfo);
       const { storage } = createEngine(extra.userToken, extra.vaultId);
       let docs = await storage.discoverDocuments();
+      if (path) {
+        // Segment-boundary match, not a bare string prefix: 'nodes/api' should
+        // not drag in 'nodes/api-design' when the caller meant the folder.
+        const prefix = path.replace(/\.md$/, '').replace(/\/+$/, '');
+        docs = docs.filter((d) => d.id === prefix || d.id.startsWith(`${prefix}/`));
+      }
       if (type) docs = docs.filter((d) => (d.frontmatter.type ?? 'document') === type);
       if (status) docs = docs.filter((d) => (d.frontmatter.status ?? 'draft') === status);
       if (tag) {
@@ -199,8 +234,115 @@ export function registerTools(server: McpServer): void {
     },
   );
 
+  // ── get_skill ──────────────────────────────────────────────────────────────
+  tool(
+    'get_skill',
+    "Render a type: skill node as a skill file for an agent harness. Returns harness-format frontmatter (for claude-code, `description` derived from the node's skill.trigger) plus the body. Find candidates with list_documents({ type: 'skill' }), or vault_info for this vault's designated entry-point skill.",
+    {
+      path: z
+        .string()
+        .describe("Skill node path (e.g., 'nodes/execution/skills/context-layer-maintenance')"),
+      harness: z
+        .enum(HARNESSES)
+        .optional()
+        .default('claude-code')
+        .describe('Target agent harness. Controls frontmatter dialect and file location.'),
+      server_alias: z
+        .string()
+        .optional()
+        .describe(
+          'The name THIS MCP server is configured as on your client — the middle segment of your tool names (mcp__<alias>__get_skill). Generated content uses it for tool references. Defaults to the vault id, which is often not what your client calls it.',
+        ),
+    },
+    async ({ path, harness, server_alias }, ctx) => {
+      const extra = getExtra(ctx.authInfo);
+      const { storage } = createEngine(extra.userToken, extra.vaultId);
+      const id = path.replace(/\.md$/, '');
+      const vaultId = resolveVaultId(extra);
+      const doc = await storage.readDocument(id);
+      const config = await storage.readConfig();
+
+      try {
+        const rendered = renderSkill(doc, {
+          harness,
+          serverAlias: server_alias ?? vaultId,
+          vaultId,
+          vaultName: config?.name,
+        });
+        return jsonResult({
+          name: rendered.name,
+          description: rendered.description,
+          harness,
+          server_alias: server_alias ?? vaultId,
+          source_path: id,
+          version: doc.frontmatter.version ?? null,
+          status: doc.frontmatter.status ?? 'draft',
+          suggested_path: rendered.relativePath,
+          content: rendered.content,
+        });
+      } catch (err) {
+        if (err instanceof NotASkillNodeError) return errorResult(err.message);
+        throw err;
+      }
+    },
+  );
+
+  // ── get_skill_install_manifest ─────────────────────────────────────────────
+  tool(
+    'get_skill_install_manifest',
+    "Return the files needed to install a vault skill locally. THIS SERVER WRITES NOTHING — it is remote and has no filesystem access; you (the calling agent) write the returned files at their relative paths with your own file tools. Defaults to mode 'loader': the file carries the trigger and a fetch instruction back to the vault node, not the procedure, so it cannot drift. Use mode 'full' only when the vault will be unreachable at run time.",
+    {
+      path: z.string().describe("Skill node path (e.g., 'nodes/execution/skills/vault-bootstrap')"),
+      harness: z.enum(HARNESSES).optional().default('claude-code').describe('Target agent harness'),
+      scope: z
+        .enum(INSTALL_SCOPES)
+        .optional()
+        .default('user')
+        .describe(
+          "'project' writes into the current repo (.claude/skills/…); 'user' writes into the home directory (~/.claude/skills/…)",
+        ),
+      server_alias: z
+        .string()
+        .optional()
+        .describe(
+          'The name THIS MCP server is configured as on your client — the middle segment of your tool names. The generated loader calls back through it, so a wrong value produces a skill that cannot fetch. Defaults to the vault id.',
+        ),
+      mode: z
+        .enum(INSTALL_MODES)
+        .optional()
+        .default('loader')
+        .describe(
+          "'loader' (default) fetches the procedure from the vault at run time. 'full' inlines a snapshot that will go stale — a deliberate choice for offline use.",
+        ),
+    },
+    async ({ path, harness, scope, server_alias, mode }, ctx) => {
+      const extra = getExtra(ctx.authInfo);
+      const { storage } = createEngine(extra.userToken, extra.vaultId);
+      const id = path.replace(/\.md$/, '');
+      const vaultId = resolveVaultId(extra);
+      const doc = await storage.readDocument(id);
+      const config = await storage.readConfig();
+
+      try {
+        return jsonResult(
+          buildInstallManifest(doc, {
+            harness,
+            scope,
+            mode,
+            serverAlias: server_alias ?? vaultId,
+            vaultId,
+            vaultName: config?.name,
+          }),
+        );
+      } catch (err) {
+        if (err instanceof NotASkillNodeError) return errorResult(err.message);
+        throw err;
+      }
+    },
+  );
+
   // ── document_format ────────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'document_format',
     'Returns the markdown document format, supported frontmatter fields, validation rules, node types, and URI scheme. Call this before creating or updating documents to ensure correct structure.',
     {},
@@ -286,7 +428,7 @@ export function registerTools(server: McpServer): void {
   );
 
   // ── read_index ─────────────────────────────────────────────────────────────
-  server.tool('read_index', 'Return the context.yaml index', {}, async (_args, ctx) => {
+  tool('read_index', 'Return the context.yaml index', {}, async (_args, ctx) => {
     const extra = getExtra(ctx.authInfo);
     const { storage } = createEngine(extra.userToken, extra.vaultId);
     const contextYaml = await storage.readContextYaml();
@@ -296,7 +438,7 @@ export function registerTools(server: McpServer): void {
   });
 
   // ── read_pack ──────────────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'read_pack',
     'Resolve and return a context pack using graph traversal',
     {
@@ -339,9 +481,9 @@ export function registerTools(server: McpServer): void {
   );
 
   // ── search ─────────────────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'search',
-    'Full-text search across vault documents with graph traversal',
+    'Search vault documents with graph traversal. Seeds are matched against title, description and tags via the index; if that finds nothing, the search is retried in full-load mode, which also matches document bodies.',
     {
       query: z.string().describe('Search query'),
       hops: z
@@ -351,17 +493,28 @@ export function registerTools(server: McpServer): void {
       full: z
         .boolean()
         .optional()
-        .describe('Force full-load mode for body-level search (default: false)'),
+        .describe(
+          'Start in full-load mode, matching document bodies as well as metadata (default: false — bodies are still reached by the automatic retry when the index finds nothing)',
+        ),
     },
     async ({ query, hops, full }, ctx) => {
       const extra = getExtra(ctx.authInfo);
       const { storage } = createEngine(extra.userToken, extra.vaultId);
       const selector = `contextnest://search/${query.replace(/\s+/g, '+')}`;
       const engine = new GraphQueryEngine(storage);
-      const result = await engine.query(selector, {
-        hops: hops ?? 2,
-        full: full ?? false,
-      });
+      const runQuery = (useFull: boolean) =>
+        engine.query(selector, { hops: hops ?? 2, full: useFull });
+
+      // Index mode seeds from context.yaml, which carries no bodies (see
+      // index-evaluator: "Lightweight search using title + tags + description
+      // (no body)"). A term that appears only in a body therefore returns
+      // nothing at all, which reads as "not in the vault" rather than "not in
+      // the metadata". Pay for the full load only once that has happened.
+      let result = await runQuery(full ?? false);
+      if (!full && result.documents.length === 0 && result.sourceNodes.length === 0) {
+        result = await runQuery(true);
+      }
+
       return jsonResult({
         documents: result.documents.map((d) => ({
           id: d.id,
@@ -380,7 +533,7 @@ export function registerTools(server: McpServer): void {
   );
 
   // ── verify_integrity ───────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'verify_integrity',
     'Verify integrity of all hash chains in the vault',
     {},
@@ -393,7 +546,7 @@ export function registerTools(server: McpServer): void {
   );
 
   // ── list_checkpoints ───────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'list_checkpoints',
     'List recent checkpoints',
     { limit: z.number().optional().describe('Max checkpoints to return (default 10)') },
@@ -412,7 +565,7 @@ export function registerTools(server: McpServer): void {
   );
 
   // ── read_version ───────────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'read_version',
     'Read a specific version of a document',
     {
@@ -430,29 +583,25 @@ export function registerTools(server: McpServer): void {
   );
 
   // ── create_document ────────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'create_document',
     'Create a new document in the vault with frontmatter and optional body content',
     {
       path: z.string().describe("Document path (e.g., 'nodes/api-design')"),
       title: z.string().describe('Document title'),
-      type: z
-        .enum([
-          'document',
-          'snippet',
-          'glossary',
-          'persona',
-          'prompt',
-          'source',
-          'tool',
-          'reference',
-          'skill',
-        ])
+      description: z
+        .string()
         .optional()
-        .default('document')
-        .describe('Node type'),
+        .describe(
+          'Short summary (1–500 chars) shown in listings and indexed for search. Changeable later with update_document.',
+        ),
+      type: z.enum(NODE_TYPES).optional().default('document').describe('Node type'),
       tags: z.array(z.string()).optional().describe('Tags for the document'),
-      body: z.string().optional().default('').describe('Markdown body content'),
+      body: z.string().optional().describe('Markdown body content'),
+      content: z
+        .string()
+        .optional()
+        .describe('Alias for `body`. Pass one or the other, not both.'),
       trigger: z
         .string()
         .optional()
@@ -462,13 +611,36 @@ export function registerTools(server: McpServer): void {
         .optional()
         .describe('Tools required for skill execution'),
       output_format: z
-        .enum(['markdown', 'json', 'text', 'code'])
+        .enum(SKILL_OUTPUT_FORMATS)
         .optional()
         .describe('Skill output format'),
+      source: sourceBlockSchema
+        .optional()
+        .describe(
+          "Source block — REQUIRED when type is 'source', and rejected on every other type. Describes how an agent fetches the live data this node stands for.",
+        ),
     },
-    async ({ path, title, type, tags, body, trigger, tools_required, output_format }, ctx) => {
+    async (
+      {
+        path,
+        title,
+        description,
+        type,
+        tags,
+        body,
+        content: bodyAlias,
+        trigger,
+        tools_required,
+        output_format,
+        source,
+      },
+      ctx,
+    ) => {
       const permErr = requireWriteScope(ctx.authInfo);
       if (permErr) return permErr;
+
+      const resolvedBody = resolveBodyArg(body, bodyAlias);
+      if (!resolvedBody.ok) return errorResult(resolvedBody.error);
 
       const extra = getExtra(ctx.authInfo);
       const { storage, sync, userToken } = createEngine(extra.userToken, extra.vaultId);
@@ -493,31 +665,58 @@ export function registerTools(server: McpServer): void {
       const tagList = tags ? tags.map((t) => (t.startsWith('#') ? t : `#${t}`)) : undefined;
       const frontmatter: Frontmatter = {
         title,
+        ...(description !== undefined ? { description } : {}),
         type,
         status: 'draft',
         created_at: new Date().toISOString(),
         ...(tagList ? { tags: tagList } : {}),
       };
 
-      if (type === 'skill') {
-        frontmatter.skill = {
-          trigger: trigger ?? `when asked to ${title.toLowerCase()}`,
-          inputs: [],
-          tools_required: tools_required ?? [],
-          output_format: output_format ?? 'markdown',
-          guard_rails: [],
-        };
-      }
+      const blocks = applyTypedBlocks(frontmatter, {
+        type,
+        source,
+        trigger,
+        tools_required,
+        output_format,
+        defaultTrigger: `when asked to ${title.toLowerCase()}`,
+      });
+      if (!blocks.ok) return errorResult(blocks.error);
 
       const node = {
         id,
         filePath: '',
         frontmatter,
-        body: body ? `\n${body}\n` : `\n# ${title}\n\n`,
+        body: resolvedBody.body ? `\n${resolvedBody.body}\n` : `\n# ${title}\n\n`,
         rawContent: '',
       };
 
+      // Validate BEFORE the write, not after. Create used to skip validation
+      // entirely, so a node that could never pass it — type: source with no
+      // source block — was written and published anyway, and then failed every
+      // update it was ever given. Checking here means an invalid create fails
+      // outright and leaves nothing on disk to clean up.
+      const validation = validateDocument(node);
+      if (!validation.valid) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                { error: 'Validation failed', errors: validation.errors },
+                null,
+                2,
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+
       const content = serializeDocument(node);
+
+      const routed = await routeWriteToReview(ctx.authInfo, storage, id, content, 'create');
+      if (routed) return routed;
+
       await storage.writeDocument(id, content);
 
       let result;
@@ -537,10 +736,14 @@ export function registerTools(server: McpServer): void {
 
       await storage.regenerateIndex();
 
-      // Git sync — errors propagate to the caller
+      // Git sync — errors propagate to the caller.
+      // Commit the POST-publish bytes: `content` above is the pre-publish
+      // serialization, still carrying status: draft and no version. Committing it
+      // leaves the repo a faithful mirror of the body but not of publication
+      // state, so anyone reading the repo concludes published nodes are drafts.
       await sync.commitFile({
         path: `${id}.md`,
-        content: Buffer.from(content, 'utf-8'),
+        content: Buffer.from(serializeDocument(result.node), 'utf-8'),
         message: `create ${id}`,
         editedBy: extra.userLogin ?? 'mcp@contextnest.hosted',
         userToken,
@@ -558,34 +761,160 @@ export function registerTools(server: McpServer): void {
   );
 
   // ── update_document ────────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'update_document',
-    "Update an existing document's frontmatter fields and/or body content",
+    "Update an existing document's frontmatter fields and/or body content. Pass at least one field to change; the body parameter accepts either `body` or `content`.",
     {
       path: z.string().describe("Document path (e.g., 'nodes/api-design')"),
       title: z.string().optional().describe('New title'),
+      description: z
+        .string()
+        .optional()
+        .describe(
+          'New description (1–500 chars) shown in listings and indexed for search. Pass an empty string to remove it.',
+        ),
       tags: z.array(z.string()).optional().describe('New tags (replaces existing)'),
       status: z.enum(['draft', 'published']).optional().describe('New status'),
-      body: z.string().optional().describe('New markdown body content'),
+      body: z.string().optional().describe('New markdown body content (replaces existing)'),
+      content: z
+        .string()
+        .optional()
+        .describe('Alias for `body`. Pass one or the other, not both.'),
+      type: z
+        .enum(NODE_TYPES)
+        .optional()
+        .describe(
+          'New node type. Re-typing to or from source/skill also needs that type\'s block in the same call — source for a source node, trigger for a skill node.',
+        ),
+      source: sourceBlockSchema
+        .optional()
+        .describe(
+          "Replacement source block. Valid only on a node that is (or is becoming) type: source; replaces the block wholesale.",
+        ),
+      trigger: z
+        .string()
+        .optional()
+        .describe("New skill trigger. Valid only on a node that is (or is becoming) type: skill."),
+      tools_required: z
+        .array(z.string())
+        .optional()
+        .describe('New skill tools_required list (replaces existing)'),
+      output_format: z
+        .enum(SKILL_OUTPUT_FORMATS)
+        .optional()
+        .describe('New skill output format'),
     },
-    async ({ path, title, tags, status, body }, ctx) => {
+    async (
+      {
+        path,
+        title,
+        description,
+        tags,
+        status,
+        body,
+        content: bodyAlias,
+        type,
+        source,
+        trigger,
+        tools_required,
+        output_format,
+      },
+      ctx,
+    ) => {
       const permErr = requireWriteScope(ctx.authInfo);
       if (permErr) return permErr;
+
+      const resolvedBody = resolveBodyArg(body, bodyAlias);
+      if (!resolvedBody.ok) return errorResult(resolvedBody.error);
+      const newBody = resolvedBody.body;
+
+      if (
+        title === undefined &&
+        description === undefined &&
+        tags === undefined &&
+        status === undefined &&
+        newBody === undefined &&
+        type === undefined &&
+        source === undefined &&
+        trigger === undefined &&
+        tools_required === undefined &&
+        output_format === undefined
+      ) {
+        return errorResult(
+          'Nothing to update: pass at least one of title, description, tags, status, body, type, source, trigger, tools_required or output_format. Publishing an unchanged document is publish_document.',
+        );
+      }
 
       const extra = getExtra(ctx.authInfo);
       const { storage, sync, userToken } = createEngine(extra.userToken, extra.vaultId);
       const id = path.replace(/\.md$/, '');
       const doc = await storage.readDocument(id);
 
+      // Snapshot what a change would have to differ from. An update that
+      // restates the document's current values is a no-op, and publishing it
+      // would mint a version, a checkpoint and a chain entry that record no
+      // edit — leaving readers a fresh `updated_at` over unchanged bytes.
+      const before = {
+        title: doc.frontmatter.title,
+        description: doc.frontmatter.description,
+        tags: JSON.stringify(doc.frontmatter.tags ?? null),
+        status: doc.frontmatter.status,
+        body: doc.body,
+        type: doc.frontmatter.type,
+        source: JSON.stringify(doc.frontmatter.source ?? null),
+        skill: JSON.stringify(doc.frontmatter.skill ?? null),
+      };
+
       if (title !== undefined) doc.frontmatter.title = title;
+      if (description !== undefined) {
+        if (description === '') delete doc.frontmatter.description;
+        else doc.frontmatter.description = description;
+      }
       if (status !== undefined) doc.frontmatter.status = status;
       if (tags !== undefined) {
         doc.frontmatter.tags = tags.map((t) => (t.startsWith('#') ? t : `#${t}`));
       }
-      doc.frontmatter.updated_at = new Date().toISOString();
-      if (body !== undefined) {
-        doc.body = `\n${body}\n`;
+      if (newBody !== undefined) {
+        doc.body = `\n${newBody}\n`;
       }
+
+      // The typed blocks are settled against the node's post-write type — the
+      // one passed in this call, or the one it already has. Without this an
+      // existing `type: source` node has no way to gain the source block rule 9
+      // demands, and every update it is ever given fails validation.
+      const nextType = type ?? doc.frontmatter.type ?? 'document';
+      if (type !== undefined) doc.frontmatter.type = nextType;
+      const blocks = applyTypedBlocks(doc.frontmatter, {
+        type: nextType,
+        source,
+        trigger,
+        tools_required,
+        output_format,
+      });
+      if (!blocks.ok) return errorResult(blocks.error);
+
+      const unchanged =
+        doc.frontmatter.title === before.title &&
+        doc.frontmatter.description === before.description &&
+        JSON.stringify(doc.frontmatter.tags ?? null) === before.tags &&
+        doc.frontmatter.status === before.status &&
+        doc.body === before.body &&
+        doc.frontmatter.type === before.type &&
+        JSON.stringify(doc.frontmatter.source ?? null) === before.source &&
+        JSON.stringify(doc.frontmatter.skill ?? null) === before.skill;
+
+      if (unchanged) {
+        return jsonResult({
+          id,
+          frontmatter: doc.frontmatter,
+          version: doc.frontmatter.version,
+          changed: false,
+          message:
+            'No changes: the values supplied match the document as stored. Version, checkpoint and chain are untouched.',
+        });
+      }
+
+      doc.frontmatter.updated_at = new Date().toISOString();
 
       const validation = validateDocument(doc);
       if (!validation.valid) {
@@ -601,6 +930,10 @@ export function registerTools(server: McpServer): void {
       }
 
       const content = serializeDocument(doc);
+
+      const routed = await routeWriteToReview(ctx.authInfo, storage, id, content, 'update');
+      if (routed) return routed;
+
       await storage.writeDocument(id, content);
 
       const result = await publishDocument(storage, id, {
@@ -610,10 +943,12 @@ export function registerTools(server: McpServer): void {
 
       await storage.regenerateIndex();
 
-      // Git sync — errors propagate to the caller
+      // Git sync — errors propagate to the caller.
+      // Post-publish bytes, for the same reason as create_document: the
+      // pre-publish `content` still carries the old version number.
       await sync.commitFile({
         path: `${id}.md`,
-        content: Buffer.from(content, 'utf-8'),
+        content: Buffer.from(serializeDocument(result.node), 'utf-8'),
         message: `update ${id}`,
         editedBy: extra.userLogin ?? 'mcp@contextnest.hosted',
         userToken,
@@ -625,19 +960,22 @@ export function registerTools(server: McpServer): void {
         version: result.node.frontmatter.version,
         checkpoint: result.checkpointNumber,
         chain_hash: result.versionEntry.chain_hash,
+        changed: true,
         message: 'Document updated and published successfully',
       });
     },
   );
 
   // ── delete_document ────────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'delete_document',
     'Delete a document and its version history from the vault',
     { path: z.string().describe("Document path (e.g., 'nodes/api-design')") },
     async ({ path }, ctx) => {
       const permErr = requireWriteScope(ctx.authInfo);
       if (permErr) return permErr;
+      const reviewErr = requireReviewerForDirectWrite(ctx.authInfo);
+      if (reviewErr) return reviewErr;
 
       const extra = getExtra(ctx.authInfo);
       const { storage, sync, userToken } = createEngine(extra.userToken, extra.vaultId);
@@ -663,7 +1001,7 @@ export function registerTools(server: McpServer): void {
   );
 
   // ── publish_document ───────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'publish_document',
     'Publish a document: bump version, compute checksum, create version entry and checkpoint',
     {
@@ -678,6 +1016,8 @@ export function registerTools(server: McpServer): void {
     async ({ path, author, note }, ctx) => {
       const permErr = requireWriteScope(ctx.authInfo);
       if (permErr) return permErr;
+      const reviewErr = requireReviewerForDirectWrite(ctx.authInfo);
+      if (reviewErr) return reviewErr;
 
       const extra = getExtra(ctx.authInfo);
       const { storage, sync, userToken } = createEngine(extra.userToken, extra.vaultId);
@@ -711,7 +1051,7 @@ export function registerTools(server: McpServer): void {
   );
 
   // ── stage_drift_suggestion ─────────────────────────────────────────────────
-  server.tool(
+  tool(
     'stage_drift_suggestion',
     'Capture an out-of-band edit (live file drifted from last-approved bytes) as a staged suggestion under _suggestions/. Does NOT modify the canonical document or hash chain.',
     {
@@ -781,7 +1121,7 @@ export function registerTools(server: McpServer): void {
   );
 
   // ── list_suggestions ───────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'list_suggestions',
     'List all staged suggestions for a document',
     { path: z.string().describe("Document path (e.g., 'nodes/api-design')") },
@@ -795,7 +1135,7 @@ export function registerTools(server: McpServer): void {
   );
 
   // ── approve_suggestion ─────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'approve_suggestion',
     'Approve a staged suggestion: applies the patch, bumps version, writes new canonical bytes, archives the suggestion under _archive/approved/.',
     {
@@ -815,6 +1155,9 @@ export function registerTools(server: McpServer): void {
     async ({ path, suggestion_id, actor, comment }, ctx) => {
       const permErr = requireWriteScope(ctx.authInfo);
       if (permErr) return permErr;
+      // Approving a suggestion publishes a new version, so it's reviewer-only under required review.
+      const reviewErr = requireReviewerForDirectWrite(ctx.authInfo);
+      if (reviewErr) return reviewErr;
 
       const extra = getExtra(ctx.authInfo);
       const { storage, sync, userToken } = createEngine(extra.userToken, extra.vaultId);
@@ -856,7 +1199,7 @@ export function registerTools(server: McpServer): void {
   );
 
   // ── reject_suggestion ──────────────────────────────────────────────────────
-  server.tool(
+  tool(
     'reject_suggestion',
     'Reject a staged suggestion: archives the patch + meta under _archive/rejected/ and emits a chain event. Canonical document and hash chain head are untouched.',
     {
@@ -897,4 +1240,7 @@ export function registerTools(server: McpServer): void {
       });
     },
   );
+
+  registerReviewTools(tool);
+  registerGitSyncTool(tool);
 }

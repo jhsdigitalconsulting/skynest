@@ -114,6 +114,13 @@ const GROUPS: EnvGroup[] = [
     ],
   },
   {
+    title: 'Vault UI',
+    note: 'Optional display settings for the browse view.',
+    vars: [
+      { name: 'VAULT_UI_ROOT', req: 'optional', description: "Folder shown as the top of the browse tree (default 'nodes'); everything outside it, such as .github or tests, is hidden. Per vault: VAULT_UI_ROOT_<VAULTID>. Set to / to show the whole repo. Ignored when no documents live under it." },
+    ],
+  },
+  {
     title: 'read.ai webhook',
     note: 'Only needed if you use the read.ai meeting-ingest webhook.',
     vars: [

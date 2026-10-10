@@ -1596,13 +1596,13 @@ describe('registerTools', () => {
   });
 
   describe('tool registration count', () => {
-    it('registers all 31 tools', async () => {
+    it('registers all 32 tools', async () => {
       const { server, tools } = makeServerStub();
       const { registerTools } = await import('./tools.js');
       // @ts-expect-error — stub
       registerTools(server);
 
-      expect(tools.size).toBe(31);
+      expect(tools.size).toBe(32);
     });
 
     it('registers the expected tool names', async () => {

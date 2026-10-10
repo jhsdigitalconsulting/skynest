@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { SignInPrompt } from '@/components/auth/SignInPrompt';
+import { GitSyncButton } from '@/components/vault/GitSync';
 import { HeaderSearch } from '@/components/vault/HeaderSearch';
 import { Toaster } from '@/components/vault/Toaster';
 import { UserMenu } from '@/components/vault/UserMenu';
@@ -15,6 +16,7 @@ import { getVaultSession } from '@/lib/vault-ui/context';
 import { loadDrafts } from '@/lib/vault-ui/data';
 import { vaultUrls } from '@/lib/vault-ui/paths';
 import { findVault, listVaults } from '@/lib/vault/registry';
+import { getGitSource } from '@/lib/vault/sync/git-pull';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -68,6 +70,8 @@ export default async function VaultLayout({ children, params }: LayoutProps) {
   }
 
   const { viewer } = session;
+  const canSync =
+    viewer.access === 'write' && (!viewer.reviewRequired || viewer.isReviewer) && getGitSource(vault.id) !== null;
   const drafts = await loadDrafts(vault.id);
   const login = viewer.login.toLowerCase();
   const reviewCount = drafts.filter((d) => d.status === 'in_review').length;
@@ -96,6 +100,7 @@ export default async function VaultLayout({ children, params }: LayoutProps) {
                 <HeaderSearch />
               </Suspense>
             </div>
+            {canSync && <GitSyncButton vaultId={vault.id} />}
             {viewer.access === 'write' && (
               <Link href={urls.newDoc()} className={buttonClass('primary', 'md', 'shrink-0')}>
                 <Icon name="plus" />

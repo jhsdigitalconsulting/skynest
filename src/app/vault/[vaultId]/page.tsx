@@ -7,6 +7,7 @@ import { TypeFilter } from '@/components/vault/TypeFilter';
 import { buttonClass } from '@/components/vault/button-styles';
 import { PAGE_CONTAINER } from '@/components/vault/layout-styles';
 import { requireViewer } from '@/lib/vault-ui/context';
+import { effectiveRoot, uiRootFor, visibleNodes } from '@/lib/vault-ui/content-root';
 import {
   buildFolderTree,
   excerptFor,
@@ -27,11 +28,13 @@ export default async function BrowsePage({ params, searchParams }: Props) {
   const { vaultId } = await params;
   const urls = vaultUrls(vaultId);
   const { folder = '', q = '', type } = await searchParams;
-  const [viewer, nodes, drafts] = await Promise.all([requireViewer(), loadNodes(vaultId), loadDrafts(vaultId)]);
+  const [viewer, allNodes, drafts] = await Promise.all([requireViewer(), loadNodes(vaultId), loadDrafts(vaultId)]);
+  const nodes = visibleNodes(allNodes, uiRootFor(vaultId));
+  const root = effectiveRoot(nodes, uiRootFor(vaultId));
   const draftByDoc = new Map(drafts.map((d) => [d.docId, d]));
   const query = q.trim();
 
-  const tree = buildFolderTree(nodes.map((n) => ({ folder: folderOf(n.id) })));
+  const tree = buildFolderTree(nodes.map((n) => ({ folder: folderOf(n.id) })), root);
   const inFolder = folder ? nodes.filter((n) => n.id.startsWith(`${folder}/`)) : nodes;
   const matched = query ? searchNodes(inFolder, query) : inFolder;
 
@@ -48,6 +51,7 @@ export default async function BrowsePage({ params, searchParams }: Props) {
   }));
 
   const crumbs = folder ? folder.split('/') : [];
+  const hiddenCrumbs = root && folder.startsWith(root) ? root.split('/').length : 0;
   const canWrite = viewer.access === 'write';
 
   return (
@@ -67,6 +71,7 @@ export default async function BrowsePage({ params, searchParams }: Props) {
                 Vault
               </Link>
               {crumbs.map((part, i) => {
+                if (i < hiddenCrumbs) return null;
                 const path = crumbs.slice(0, i + 1).join('/');
                 return (
                   <span key={path} className="flex items-center gap-1">

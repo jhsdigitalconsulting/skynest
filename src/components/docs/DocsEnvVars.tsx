@@ -109,7 +109,15 @@ const GROUPS: EnvGroup[] = [
     note: 'Only needed to use the /api/vault/init-from-git initialization endpoint.',
     vars: [
       { name: 'VAULT_ADMIN_TOKEN', req: 'optional', description: 'Bearer token compared against the Authorization header to authorize the headless vault-init flow.' },
-      { name: 'VAULT_GITHUB_ADMIN_TOKEN', req: 'optional', description: 'GitHub admin token used by init-from-git to read/clone the vault repo during initialization.' },
+      { name: 'VAULT_GITHUB_ADMIN_TOKEN', req: 'optional', description: 'GitHub token with read access to the vault repo. Used by init-from-git, headless MCP calls to sync_from_git, and the push webhook (which has no signed-in user).' },
+      { name: 'GIT_SYNC_WEBHOOK_SECRET', req: 'optional', description: 'Shared secret for the GitHub push webhook at /api/webhooks/github/<vaultId> (per vault: GIT_SYNC_WEBHOOK_SECRET_<VAULTID>). The webhook fast-forwards files Git changed; conflicts and deletions wait for a person to press Sync from Git.' },
+    ],
+  },
+  {
+    title: 'Vault UI',
+    note: 'Optional display settings for the browse view.',
+    vars: [
+      { name: 'VAULT_UI_ROOT', req: 'optional', description: "Folder shown as the top of the browse tree (default 'nodes'); everything outside it, such as .github or tests, is hidden. Per vault: VAULT_UI_ROOT_<VAULTID>. Set to / to show the whole repo. Ignored when no documents live under it." },
     ],
   },
   {

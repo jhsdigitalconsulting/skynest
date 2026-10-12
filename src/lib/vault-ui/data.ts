@@ -50,15 +50,21 @@ export async function loadDocList(vaultId: string): Promise<DocListItem[]> {
   return nodes.map((n) => toListItem(n, byDoc.get(n.id)));
 }
 
-export function buildFolderTree(items: { folder: string }[]): FolderNode {
-  const root: FolderNode = { name: '', path: '', count: 0, children: [] };
+/**
+ * Folder tree for the sidebar. With a `root`, that folder is the top: its
+ * children become the first level, while every node keeps its full path so
+ * links and the `folder` query param are unchanged.
+ */
+export function buildFolderTree(items: { folder: string }[], root = ''): FolderNode {
+  const treeRoot: FolderNode = { name: '', path: root, count: 0, children: [] };
   for (const item of items) {
-    root.count++;
-    if (!item.folder) continue;
-    let cursor = root;
-    const parts = item.folder.split('/');
+    treeRoot.count++;
+    const rest = root ? (item.folder === root ? '' : item.folder.startsWith(`${root}/`) ? item.folder.slice(root.length + 1) : null) : item.folder;
+    if (!rest) continue;
+    let cursor = treeRoot;
+    const parts = rest.split('/');
     parts.forEach((part, i) => {
-      const path = parts.slice(0, i + 1).join('/');
+      const path = (root ? [root, ...parts.slice(0, i + 1)] : parts.slice(0, i + 1)).join('/');
       let child = cursor.children.find((c) => c.path === path);
       if (!child) {
         child = { name: part, path, count: 0, children: [] };
@@ -72,8 +78,8 @@ export function buildFolderTree(items: { folder: string }[]): FolderNode {
     node.children.sort((a, b) => a.name.localeCompare(b.name));
     node.children.forEach(sort);
   };
-  sort(root);
-  return root;
+  sort(treeRoot);
+  return treeRoot;
 }
 
 /**

@@ -1,8 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getDraft, readDocumentOrNull } from '@/lib/review';
+import { getDraft, readDocumentOrNull, staleReasonFor } from '@/lib/review';
 import type { Draft } from '@/lib/review';
-import type { ContextNode } from '@promptowl/contextnest-engine';
 import { ActivityThread } from '@/components/vault/ActivityThread';
 import { DiffView } from '@/components/vault/DiffView';
 import { DocBreadcrumbs } from '@/components/vault/DocBreadcrumbs';
@@ -28,17 +27,6 @@ interface Props {
 export async function generateMetadata({ params }: Props) {
   const { path } = await params;
   return { title: `Review · ${decodeSegments(path)}` };
-}
-
-function staleReasonFor(draft: Draft, node: ContextNode | null): string | null {
-  if (draft.isNew && node) {
-    return `Someone published “${draft.docId}” after this draft was started. Approving will overwrite it.`;
-  }
-  const live = node?.frontmatter.version ?? null;
-  if (!draft.isNew && node && live !== draft.baseVersion) {
-    return `The published document moved to v${live} after this draft was started from v${draft.baseVersion ?? '–'}. Approving will replace those newer changes.`;
-  }
-  return null;
 }
 
 function involves(draft: Draft, login: string): boolean {

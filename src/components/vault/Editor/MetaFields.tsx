@@ -1,6 +1,8 @@
 'use client';
 
 import type { EditorFields } from '@/lib/vault-ui/types';
+import { Icon } from '../Icon';
+import { FIELD_INPUT, FIELD_LABEL } from './field-styles';
 import { PathField } from './PathField';
 import { TagInput } from './TagInput';
 
@@ -26,9 +28,6 @@ const TYPES = [
   { value: 'persona', label: 'Persona' },
 ];
 
-const INPUT =
-  'block w-full rounded-lg border-0 bg-white text-sm text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-500';
-
 /** Title, description, tags, type and (for new documents) location. */
 export function MetaFields(props: Props) {
   const { fields, isNew, pathLocked, disabled, onChange } = props;
@@ -45,9 +44,9 @@ export function MetaFields(props: Props) {
       />
       {pathLocked && <p className="mt-1 font-mono text-xs text-gray-400">{props.docId}.md</p>}
 
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
+      <div className="mt-6 grid items-start gap-x-4 gap-y-5 md:grid-cols-[minmax(0,1fr)_14rem]">
         <div className="md:col-span-2">
-          <label htmlFor="doc-description" className="mb-1 block text-xs font-medium text-gray-500">
+          <label htmlFor="doc-description" className={FIELD_LABEL}>
             Description
           </label>
           <input
@@ -56,31 +55,37 @@ export function MetaFields(props: Props) {
             onChange={(e) => onChange('description', e.target.value)}
             disabled={disabled}
             placeholder="One line that tells agents and people what this is for"
-            className={INPUT}
+            className={FIELD_INPUT}
           />
         </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">Tags</label>
+        <div className={isNew ? undefined : 'md:col-span-2'}>
+          <label className={FIELD_LABEL}>Tags</label>
           <TagInput value={fields.tags} onChange={(tags) => onChange('tags', tags)} disabled={disabled} />
         </div>
         {isNew ? (
           <div>
-            <label htmlFor="doc-type" className="mb-1 block text-xs font-medium text-gray-500">
+            <label htmlFor="doc-type" className={FIELD_LABEL}>
               Type
             </label>
-            <select
-              id="doc-type"
-              value={fields.type}
-              onChange={(e) => onChange('type', e.target.value)}
-              disabled={disabled}
-              className={INPUT}
-            >
-              {TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                id="doc-type"
+                value={fields.type}
+                onChange={(e) => onChange('type', e.target.value)}
+                disabled={disabled}
+                className={`${FIELD_INPUT} appearance-none pr-9`}
+              >
+                {TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <Icon
+                name="chevronDown"
+                className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+              />
+            </div>
           </div>
         ) : null}
         {!pathLocked && (

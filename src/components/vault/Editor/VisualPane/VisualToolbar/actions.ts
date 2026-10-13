@@ -2,7 +2,7 @@ import type { Editor } from '@tiptap/core';
 import type { IconName } from '../../../Icon';
 
 /** The dialogs the toolbar can open. */
-export type VisualDialog = 'url' | 'doc' | 'image';
+export type VisualDialog = 'url' | 'doc' | 'image' | 'table';
 
 export interface VisualAction {
   key: string;
@@ -58,7 +58,7 @@ export const ACTIONS: VisualAction[][] = [
       label: 'Table',
       icon: 'table',
       active: 'table',
-      run: (e) => e.chain().focus().insertTable({ rows: 3, cols: 2, withHeaderRow: true }).run(),
+      run: (_e, open) => open('table'),
     },
   ],
   [{ key: 'image', label: 'Image or video', icon: 'image', active: 'image', run: (_e, open) => open('image') }],

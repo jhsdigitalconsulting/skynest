@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Icon } from '../Icon';
+import { FIELD_FRAME } from './field-styles';
 
 interface Props {
   value: string[];
@@ -27,7 +28,7 @@ export function TagInput({ value, onChange, disabled }: Props) {
   };
 
   return (
-    <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-lg bg-white px-2 py-1 ring-1 ring-inset ring-gray-300 focus-within:ring-2 focus-within:ring-indigo-500">
+    <div className={`flex min-h-10 flex-wrap items-center gap-1.5 px-2.5 py-1.5 ${FIELD_FRAME}`}>
       {display.map((tag) => (
         <span key={tag} className="inline-flex items-center gap-1 rounded-md bg-indigo-50 py-0.5 pl-2 pr-1 text-xs font-medium text-indigo-700">
           #{tag}
@@ -62,7 +63,7 @@ export function TagInput({ value, onChange, disabled }: Props) {
         onBlur={() => draft.trim() && add(draft)}
         placeholder={display.length ? 'Add tag…' : 'Add tags — press Enter after each'}
         aria-label="Add tag"
-        className="min-w-32 flex-1 border-0 bg-transparent p-1 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-0"
+        className="h-6 min-w-32 flex-1 border-0 bg-transparent p-0 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-0"
       />
     </div>
   );

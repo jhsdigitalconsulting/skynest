@@ -1,6 +1,8 @@
 'use client';
 
 import type { Editor } from '@tiptap/core';
+import { useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { useEditorState } from '@tiptap/react';
 import { Icon } from '../../../Icon';
 import { ACTIONS, isActive } from './actions';
@@ -31,8 +33,30 @@ export function VisualToolbar({ editor, disabled, onOpenDialog }: VisualToolbarP
         : {},
   });
 
+  // Roving tabindex: the toolbar is a single tab stop, so Tab goes on to the editor body.
+  // Arrow keys move between buttons.
+  const [focusKey, setFocusKey] = useState<string | null>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const isEnabled = (key: string) => !disabled && !!editor && (state?.[key]?.enabled ?? true);
+  const allKeys = ACTIONS.flat().map((a) => a.key);
+  const tabStop = focusKey && isEnabled(focusKey) ? focusKey : allKeys.find(isEnabled);
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const buttons = Array.from(toolbarRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []);
+    const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (at < 0) return;
+    let next = -1;
+    if (e.key === 'ArrowRight') next = (at + 1) % buttons.length;
+    else if (e.key === 'ArrowLeft') next = (at - 1 + buttons.length) % buttons.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = buttons.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    buttons[next].focus();
+  };
+
   return (
-    <div className="flex flex-wrap items-center gap-0.5" role="toolbar" aria-label="Formatting">
+    <div ref={toolbarRef} onKeyDown={onKeyDown} className="flex flex-wrap items-center gap-0.5" role="toolbar" aria-label="Formatting">
       {ACTIONS.map((group, gi) => (
         <div key={gi} className="flex items-center gap-0.5">
           {gi > 0 && <span className="mx-1 h-5 w-px bg-gray-200" />}
@@ -43,6 +67,8 @@ export function VisualToolbar({ editor, disabled, onOpenDialog }: VisualToolbarP
                 key={action.key}
                 type="button"
                 disabled={disabled || !editor || !enabled}
+                tabIndex={action.key === tabStop ? 0 : -1}
+                onFocus={() => setFocusKey(action.key)}
                 // Keep focus (and the selection) in the editor.
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => editor && action.run(editor, onOpenDialog)}

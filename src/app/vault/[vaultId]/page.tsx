@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { DocList } from '@/components/vault/DocList';
 import { EmptyState } from '@/components/vault/EmptyState';
+import { FolderActionsProvider, NewFolderButton } from '@/components/vault/FolderActions';
 import { FolderTree } from '@/components/vault/FolderTree';
 import { Icon } from '@/components/vault/Icon';
 import { TypeFilter } from '@/components/vault/TypeFilter';
@@ -17,6 +18,7 @@ import {
   searchNodes,
   toListItem,
 } from '@/lib/vault-ui/data';
+import { flattenFolders } from '@/lib/vault-ui/folder-path';
 import { vaultUrls } from '@/lib/vault-ui/paths';
 
 interface Props {
@@ -53,13 +55,15 @@ export default async function BrowsePage({ params, searchParams }: Props) {
   const crumbs = folder ? folder.split('/') : [];
   const hiddenCrumbs = root && folder.startsWith(root) ? root.split('/').length : 0;
   const canWrite = viewer.access === 'write';
+  const existingFolders = flattenFolders(tree);
 
   return (
+    <FolderActionsProvider rootPath={tree.path} existingFolders={existingFolders}>
     <div className={`${PAGE_CONTAINER} flex gap-8 py-6`}>
       <aside className="hidden w-60 shrink-0 lg:block">
         <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-1">
           <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Folders</p>
-          <FolderTree root={tree} activeFolder={folder} />
+          <FolderTree root={tree} activeFolder={folder} canWrite={canWrite} />
         </div>
       </aside>
 
@@ -98,10 +102,13 @@ export default async function BrowsePage({ params, searchParams }: Props) {
             </p>
           </div>
           {canWrite && (
-            <Link href={urls.newDoc(folder || undefined)} className={buttonClass('secondary')}>
-              <Icon name="plus" />
-              New document{folder ? ' here' : ''}
-            </Link>
+            <div className="flex gap-2">
+              <NewFolderButton parent={folder || tree.path} />
+              <Link href={urls.newDoc(folder || undefined)} className={buttonClass('secondary')}>
+                <Icon name="plus" />
+                New document{folder ? ' here' : ''}
+              </Link>
+            </div>
           )}
         </div>
 
@@ -141,5 +148,6 @@ export default async function BrowsePage({ params, searchParams }: Props) {
         )}
       </main>
     </div>
+    </FolderActionsProvider>
   );
 }

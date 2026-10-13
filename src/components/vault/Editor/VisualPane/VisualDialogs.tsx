@@ -5,6 +5,7 @@ import { contextnestHref } from '@/lib/vault-ui/wikilinks';
 import type { LinkTarget } from '@/lib/vault-ui/wikilinks';
 import { DocLinkDialog, titleOf } from '../dialogs/DocLinkDialog';
 import { MediaDialog } from '../dialogs/MediaDialog';
+import { TableDialog } from '../dialogs/TableDialog';
 import { UrlLinkDialog } from '../dialogs/UrlLinkDialog';
 import { applyLink, currentHref, removeLink } from './linking';
 import { altFromName, insertAsset } from './media';
@@ -18,7 +19,7 @@ interface Props {
   onClose: () => void;
 }
 
-/** The link and media dialogs, applying their result to the editor. */
+/** The link, table and media dialogs, applying their result to the editor. */
 export function VisualDialogs({ editor, dialog, docs, vaultId, onClose }: Props) {
   const done = (apply: () => void) => {
     onClose();
@@ -43,6 +44,14 @@ export function VisualDialogs({ editor, dialog, docs, vaultId, onClose }: Props)
         onClose={() => done(() => editor.commands.focus())}
         onSubmit={(url, text) => done(() => applyLink(editor, url, text))}
         onRemove={() => done(() => removeLink(editor))}
+      />
+    );
+  }
+  if (dialog === 'table') {
+    return (
+      <TableDialog
+        onClose={() => done(() => editor.commands.focus())}
+        onSubmit={(rows, cols) => done(() => editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run())}
       />
     );
   }

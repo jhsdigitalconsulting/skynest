@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { getDraft, readDocumentOrNull, summarizeDraft } from '@/lib/review';
+import { getDraft, readDocumentOrNull, staleReasonFor, summarizeDraft } from '@/lib/review';
 import { DiffView } from '@/components/vault/DiffView';
 import { DocBreadcrumbs } from '@/components/vault/DocBreadcrumbs';
 import { DocDetails } from '@/components/vault/DocDetails';
@@ -96,7 +96,12 @@ export default async function DocPage({ params, searchParams }: Props) {
 
       {draft && (
         <div className="mt-5">
-          <PendingDraftBanner vaultId={vaultId} draft={summarizeDraft(draft)} canEdit={canWrite} />
+          <PendingDraftBanner
+            vaultId={vaultId}
+            draft={summarizeDraft(draft)}
+            canEdit={canWrite}
+            reviewer={canWrite && viewer.isReviewer ? { staleReason: staleReasonFor(draft, node) } : undefined}
+          />
         </div>
       )}
 

@@ -13,19 +13,24 @@ interface Props {
   revision: number;
   /** Explanation when the live document has moved on since the draft started. */
   staleReason: string | null;
+  /** 'stack' fills the width (action card); 'inline' sits side by side (banner). */
+  layout?: 'stack' | 'inline';
 }
 
 /** Approve / request changes, for reviewers looking at a draft in review. */
-export function ReviewerPanel({ docId, revision, staleReason }: Props) {
+export function ReviewerPanel({ docId, revision, staleReason, layout = 'stack' }: Props) {
   const { run, pending } = useVaultAction();
   const vaultId = useVaultId();
   const [dialog, setDialog] = useState<'approve' | 'changes' | null>(null);
   const [force, setForce] = useState(false);
   const close = () => setDialog(null);
+  const stacked = layout === 'stack';
+  const size = stacked ? 'md' : 'sm';
+  const width = stacked ? 'w-full justify-center' : undefined;
 
   return (
     <>
-      <div className="grid gap-2">
+      <div className={stacked ? 'grid gap-2' : 'flex gap-2'}>
         <button
           type="button"
           onClick={() => {
@@ -33,7 +38,7 @@ export function ReviewerPanel({ docId, revision, staleReason }: Props) {
             setDialog('approve');
           }}
           disabled={pending}
-          className={buttonClass('success', 'md', 'w-full justify-center')}
+          className={buttonClass('success', size, width)}
         >
           <Icon name="check" />
           Approve &amp; publish
@@ -42,7 +47,7 @@ export function ReviewerPanel({ docId, revision, staleReason }: Props) {
           type="button"
           onClick={() => setDialog('changes')}
           disabled={pending}
-          className={buttonClass('secondary', 'md', 'w-full justify-center')}
+          className={buttonClass('secondary', size, width)}
         >
           <Icon name="undo" />
           Request changes

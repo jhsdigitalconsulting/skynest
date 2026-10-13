@@ -3,12 +3,15 @@ import type { DraftSummary } from '@/lib/review/types';
 import { vaultUrls } from '@/lib/vault-ui/paths';
 import { Icon } from './Icon';
 import { RelativeTime } from './RelativeTime';
+import { ReviewerPanel } from './ReviewActions/ReviewerPanel';
 import { buttonClass } from './button-styles';
 
 interface Props {
   vaultId: string;
   draft: DraftSummary;
   canEdit: boolean;
+  /** Set when the viewer may approve this draft; adds Approve / Request changes buttons. */
+  reviewer?: { staleReason: string | null };
 }
 
 const COPY = {
@@ -22,7 +25,7 @@ const COPY = {
 } as const;
 
 /** Shown on a document when someone has a draft of it in flight. */
-export function PendingDraftBanner({ vaultId, draft, canEdit }: Props) {
+export function PendingDraftBanner({ vaultId, draft, canEdit, reviewer }: Props) {
   const urls = vaultUrls(vaultId);
   const copy = COPY[draft.status];
   return (
@@ -41,7 +44,10 @@ export function PendingDraftBanner({ vaultId, draft, canEdit }: Props) {
           </span>
         )}
       </p>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
+        {reviewer && draft.status === 'in_review' && (
+          <ReviewerPanel docId={draft.docId} revision={draft.revision} staleReason={reviewer.staleReason} layout="inline" />
+        )}
         <Link href={urls.reviewDraft(draft.docId)} className={buttonClass('secondary', 'sm')}>
           <Icon name="diff" className="h-3.5 w-3.5" />
           View changes

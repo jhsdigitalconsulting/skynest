@@ -109,7 +109,7 @@ export function VisualPane({ value, onChange, disabled, controls, links }: Visua
   }, [editor, media.editorRef]);
 
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
+    <div className="overflow-clip rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
       <div className="sticky top-14 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white/95 px-2 py-1.5 backdrop-blur">
         <VisualToolbar editor={editor} disabled={disabled} onOpenDialog={setDialog} />
         {controls}

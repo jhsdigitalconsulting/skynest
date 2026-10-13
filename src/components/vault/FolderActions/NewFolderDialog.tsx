@@ -63,7 +63,7 @@ export function NewFolderDialog({ parent, existingFolders, onClose }: Props) {
         >
           Folder name
         </label>
-        <div className="flex items-stretch overflow-hidden rounded-lg bg-white font-mono text-sm ring-1 ring-inset ring-gray-300 focus-within:ring-2 focus-within:ring-indigo-500">
+        <div className="flex items-stretch overflow-hidden rounded-lg bg-white font-mono text-sm outline outline-1 -outline-offset-1 outline-gray-300 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
           {parent && (
             <span className="flex items-center bg-gray-50 px-3 text-gray-500">
               {parent}/

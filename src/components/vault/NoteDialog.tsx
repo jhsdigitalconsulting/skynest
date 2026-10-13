@@ -65,7 +65,7 @@ export function NoteDialog(props: Props) {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) confirm();
         }}
         placeholder={props.placeholder}
-        className="mt-1.5 block w-full rounded-lg border-0 text-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500"
+        className="mt-1.5 block w-full rounded-lg border-0 px-3 py-2 text-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500"
       />
       <p className="mt-1.5 text-xs text-gray-400">⌘ Enter to confirm</p>
       {props.extra}

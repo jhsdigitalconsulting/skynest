@@ -11,6 +11,7 @@ import type { RbacHook } from '@promptowl/contextnest-engine';
 import {
   ReviewError,
   approveDraft,
+  approveDrafts,
   commentOnDraft,
   discardDraft,
   listDrafts,
@@ -20,7 +21,7 @@ import {
   submitDraft,
   withdrawDraft,
 } from '@/lib/review';
-import type { DraftChanges } from '@/lib/review';
+import type { BulkApproveItem, DraftChanges } from '@/lib/review';
 import {
   VaultAuthError,
   actorFor,
@@ -28,6 +29,7 @@ import {
   requireWriter,
 } from '@/lib/vault-ui/context';
 import { vaultUrls } from '@/lib/vault-ui/paths';
+import { nextInReview } from '@/lib/vault-ui/review-queue';
 import type { ActionResult, EditorFields } from '@/lib/vault-ui/types';
 import { applySettings } from '@/lib/vault-ui/vault-settings';
 import type { VaultSettingsInput } from '@/lib/vault-ui/vault-settings';
@@ -175,38 +177,101 @@ export async function commentAction(vaultId: string, docId: string, message: str
   });
 }
 
-export async function requestChangesAction(vaultId: string, docId: string, message: string): Promise<ActionResult> {
+/**
+ * Where to go once `docId` has left the review queue: the item that took its place.
+ * `current` is the document open in the review pane; when the action was about some
+ * other document the pane stays put (null).
+ */
+function advanceTo(
+  vaultId: string,
+  drafts: Awaited<ReturnType<typeof listDrafts>>,
+  docId: string,
+  current: string | null,
+  gone: readonly string[] = [],
+): string | null {
+  if (current === null || (current !== docId && !gone.includes(current))) return null;
+  const next = nextInReview(drafts, current, gone);
+  return next ? vaultUrls(vaultId).reviewDraft(next, undefined, 'review') : null;
+}
+
+export async function requestChangesAction(
+  vaultId: string,
+  docId: string,
+  message: string,
+  options: { current?: string | null } = {},
+): Promise<ActionResult> {
   return run(async () => {
     const viewer = await requireWriter();
     const { storage } = engineFor(viewer, vaultId);
+    const before = await listDrafts(storage, { status: 'in_review' });
     await requestChanges({ storage, actor: actorFor(viewer) }, docId, message);
-    return { ok: true, message: 'Changes requested — the author has been sent your feedback' };
+    const id = normalizeDocId(docId);
+    const redirectTo = advanceTo(vaultId, before, id, options.current === undefined ? id : options.current);
+    return {
+      ok: true,
+      message: 'Changes requested — the author has been sent your feedback',
+      ...(redirectTo ? { redirectTo } : {}),
+    };
   });
 }
 
 export async function approveAction(
   vaultId: string,
   docId: string,
-  options: { note?: string; force?: boolean; expectedRevision?: number } = {},
+  options: { note?: string; force?: boolean; expectedRevision?: number; current?: string | null } = {},
 ): Promise<ActionResult> {
   return run(async () => {
     const viewer = await requireWriter();
     const { storage, sync, userToken } = engineFor(viewer, vaultId);
+    const { current, ...approveOptions } = options;
+    const id = normalizeDocId(docId);
+    const before = await listDrafts(storage, { status: 'in_review' });
     const result = await approveDraft(
       { storage, sync, userToken, actor: actorFor(viewer) },
       docId,
-      options,
+      approveOptions,
     );
-    // With more drafts waiting, a reviewer working the queue wants the next one, not the doc they just approved.
-    const waiting = (await listDrafts(storage, { status: 'in_review' })).length;
-    const urls = vaultUrls(vaultId);
-    return {
-      ok: true,
-      message: waiting
-        ? `Approved and published v${result.version} · ${waiting} more waiting for review`
-        : `Approved and published v${result.version}`,
-      redirectTo: waiting ? urls.review() : urls.doc(normalizeDocId(docId)),
-    };
+    const waiting = before.length - 1;
+    const viewing = current === undefined ? id : current;
+    const next = advanceTo(vaultId, before, id, viewing);
+    const message = waiting
+      ? `Approved and published v${result.version} · ${waiting} more waiting for review`
+      : `Approved and published v${result.version}`;
+    // A reviewer working the queue wants the next item, not the doc they just approved.
+    // With nothing left (or the approval was for another item), open the doc or stay put.
+    if (next) return { ok: true, message, redirectTo: next };
+    if (viewing === id) return { ok: true, message, redirectTo: vaultUrls(vaultId).doc(id) };
+    return { ok: true, message };
+  });
+}
+
+/** Approve several drafts in one go. Stale drafts are skipped, never force-published. */
+export async function bulkApproveAction(
+  vaultId: string,
+  items: BulkApproveItem[],
+  options: { note?: string; current?: string | null } = {},
+): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireWriter();
+    if (items.length === 0) return { ok: false, error: 'Nothing selected.' };
+    const { storage, sync, userToken } = engineFor(viewer, vaultId);
+    const before = await listDrafts(storage, { status: 'in_review' });
+    const res = await approveDrafts({ storage, sync, userToken, actor: actorFor(viewer) }, items, {
+      note: options.note,
+    });
+    const parts = [`Approved ${res.approved.length}`];
+    if (res.skipped.length) parts.push(`${res.skipped.length} skipped (out of date)`);
+    if (res.failed.length) parts.push(`${res.failed.length} failed (${res.failed[0].error})`);
+    const message = parts.join(' · ');
+    if (res.approved.length === 0) return { ok: false, error: message };
+    const gone = res.approved.map((a) => a.docId);
+    const current = options.current ?? null;
+    // When the open item was approved, move on to whatever is next (or back to the empty queue).
+    const redirectTo =
+      current && gone.includes(current)
+        ? (advanceTo(vaultId, before, current, current, gone) ?? vaultUrls(vaultId).review())
+        : null;
+    return { ok: true, message, ...(redirectTo ? { redirectTo } : {}) };
   });
 }
 

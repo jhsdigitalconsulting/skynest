@@ -40,7 +40,13 @@ export function vaultUrls(vaultId: string) {
     /** Vault settings: name, folders and agent files (.context/config.yaml). */
     settings: `${root}/settings`,
     review: (tab?: string) => (tab ? `${root}/review?tab=${tab}` : `${root}/review`),
-    reviewDraft: (id: string, tab?: 'changes' | 'current') =>
-      `${root}/review/${encodeId(id)}${tab ? `?tab=${tab}` : ''}`,
+    /** `tab` picks the preview/changes/published view; `list` keeps the queue's left-hand tab. */
+    reviewDraft: (id: string, tab?: 'changes' | 'current', list?: string) => {
+      const params = new URLSearchParams();
+      if (tab) params.set('tab', tab);
+      if (list) params.set('list', list);
+      const qs = params.toString();
+      return `${root}/review/${encodeId(id)}${qs ? `?${qs}` : ''}`;
+    },
   };
 }

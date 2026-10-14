@@ -26,7 +26,9 @@ interface NavItem {
 export function VaultNav({ reviewCount, myDraftCount, canEditContext }: Props) {
   const urls = useVaultUrls();
   const pathname = usePathname();
-  const tab = useSearchParams().get('tab');
+  const params = useSearchParams();
+  // On a draft, `tab` is the preview/changes view and `list` is the queue tab.
+  const tab = params.get('list') ?? params.get('tab');
   const inReview = pathname.startsWith(`${urls.root}/review`);
 
   const items: NavItem[] = [

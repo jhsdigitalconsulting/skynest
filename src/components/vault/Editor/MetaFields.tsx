@@ -3,6 +3,7 @@
 import type { EditorFields } from '@/lib/vault-ui/types';
 import { Icon } from '../Icon';
 import { FIELD_INPUT, FIELD_LABEL } from './field-styles';
+import type { TagCount } from '@/lib/vault-ui/tags';
 import { PathField } from './PathField';
 import { TagInput } from './TagInput';
 
@@ -14,6 +15,8 @@ interface Props {
   folder: string;
   slug: string;
   folders: string[];
+  /** Tags already used in the vault, for the tag typeahead. */
+  tagVocabulary: TagCount[];
   disabled: boolean;
   onTitleChange: (title: string) => void;
   onChange: <K extends keyof EditorFields>(key: K, value: EditorFields[K]) => void;
@@ -60,7 +63,7 @@ export function MetaFields(props: Props) {
         </div>
         <div className={isNew ? undefined : 'md:col-span-2'}>
           <label className={FIELD_LABEL}>Tags</label>
-          <TagInput value={fields.tags} onChange={(tags) => onChange('tags', tags)} disabled={disabled} />
+          <TagInput value={fields.tags} vocabulary={props.tagVocabulary} onChange={(tags) => onChange('tags', tags)} disabled={disabled} />
         </div>
         {isNew ? (
           <div>

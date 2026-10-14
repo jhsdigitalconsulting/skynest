@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
+import { TextSelection } from '@tiptap/pm/state';
 import { vaultUrls } from '@/lib/vault-ui/paths';
 import { contextnestHref, resolveVaultHref } from '@/lib/vault-ui/wikilinks';
 import type { LinkTarget } from '@/lib/vault-ui/wikilinks';
@@ -14,6 +15,9 @@ import { docSlash } from './doc-slash';
 import type { DocSlashBridge, DocSlashState } from './doc-slash';
 import { DocSlashMenu } from './DocSlashMenu';
 import type { DocSlashMenuHandle } from './DocSlashMenu';
+import { LinkContextMenu } from './LinkContextMenu';
+import type { LinkMenuState } from './LinkContextMenu';
+import { removeLink } from './linking';
 import { loadMarkdown, toMarkdown } from './markdown-sync';
 import type { SourceMap } from './markdown-sync';
 import { VisualDialogs } from './VisualDialogs';
@@ -46,6 +50,7 @@ function linkDestination(href: string, links: VaultLinks): string | null {
  */
 export function VisualPane({ value, onChange, disabled, controls, links }: VisualPaneProps) {
   const [dialog, setDialog] = useState<VisualDialog | null>(null);
+  const [linkMenu, setLinkMenu] = useState<LinkMenuState | null>(null);
   const linksRef = useRef(links);
   useEffect(() => {
     linksRef.current = links;
@@ -95,6 +100,18 @@ export function VisualPane({ value, onChange, disabled, controls, links }: Visua
           return true;
         }
         return false;
+      },
+      handleDOMEvents: {
+        // Right-clicking a link offers to edit it; elsewhere the browser's own menu stays.
+        contextmenu: (view, event) => {
+          const href = (event.target as HTMLElement).closest('a')?.getAttribute('href');
+          if (!href || !view.editable) return false;
+          const at = view.posAtCoords({ left: event.clientX, top: event.clientY });
+          if (at) view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at.pos)));
+          event.preventDefault();
+          setLinkMenu({ x: event.clientX, y: event.clientY, href });
+          return true;
+        },
       },
       // Links don't navigate while editing; ⌘/Ctrl-click opens them in a new tab.
       handleClick: (_view, _pos, event) => {
@@ -159,6 +176,25 @@ export function VisualPane({ value, onChange, disabled, controls, links }: Visua
         <div className="min-h-[480px] px-6 py-5 text-sm text-gray-400 sm:px-8">Loading editor…</div>
       )}
       {editor && slash && <DocSlashMenu ref={slashMenu} state={slash} docs={links.index.docs} onPick={pickSlash} />}
+      {editor && linkMenu && (
+        <LinkContextMenu
+          state={linkMenu}
+          onClose={() => setLinkMenu(null)}
+          onEdit={() => {
+            setLinkMenu(null);
+            setDialog('url');
+          }}
+          onOpen={() => {
+            setLinkMenu(null);
+            const url = linkDestination(linkMenu.href, linksRef.current);
+            if (url) window.open(url, '_blank', 'noopener,noreferrer');
+          }}
+          onRemove={() => {
+            setLinkMenu(null);
+            removeLink(editor);
+          }}
+        />
+      )}
       {editor && dialog && (
         <VisualDialogs editor={editor} dialog={dialog} docs={links.index.docs} vaultId={links.vaultId} onClose={() => setDialog(null)} />
       )}

@@ -63,6 +63,8 @@ export interface SaveInput {
   fields: EditorFields;
   /** Revision the editor loaded; null when no draft existed yet. */
   expectedRevision: number | null;
+  /** Set when editing inside the review queue: the queue tab to return to. */
+  queueList?: string;
 }
 
 export async function saveDraftAction(vaultId: string, input: SaveInput): Promise<ActionResult> {
@@ -101,7 +103,7 @@ export async function submitForReviewAction(
     return {
       ok: true,
       message: 'Submitted for review',
-      redirectTo: vaultUrls(vaultId).reviewDraft(draft.docId),
+      redirectTo: vaultUrls(vaultId).reviewDraft(draft.docId, undefined, input.queueList),
     };
   });
 }
@@ -115,6 +117,7 @@ export async function publishNowAction(vaultId: string, input: SaveInput & { not
     }
     const { storage, sync, userToken } = engineFor(viewer, vaultId);
     const actor = actorFor(viewer);
+    const before = input.queueList ? await listDrafts(storage, { status: 'in_review' }) : [];
     const draft = await saveDraft(
       { storage, actor },
       {
@@ -127,11 +130,12 @@ export async function publishNowAction(vaultId: string, input: SaveInput & { not
     const result = await approveDraft({ storage, sync, userToken, actor }, draft.docId, {
       note: input.note,
     });
-    return {
-      ok: true,
-      message: `Published v${result.version}`,
-      redirectTo: vaultUrls(vaultId).doc(draft.docId),
-    };
+    // Editing from the review queue: carry on with the next item rather than leaving it.
+    const inQueue = input.queueList !== undefined;
+    const redirectTo = inQueue
+      ? (advanceTo(vaultId, before, draft.docId, draft.docId) ?? vaultUrls(vaultId).review(input.queueList))
+      : vaultUrls(vaultId).doc(draft.docId);
+    return { ok: true, message: `Published v${result.version}`, redirectTo };
   });
 }
 

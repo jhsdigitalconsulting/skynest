@@ -18,10 +18,12 @@ interface Props {
   canManage: boolean;
   /** May open the editor (false only for a draft in review someone else owns). */
   canEdit: boolean;
+  /** Queue tab to return to; when set, editing opens beside the queue instead of leaving it. */
+  queueList?: string;
 }
 
 /** Edit / submit / withdraw / discard, for the people working on the draft. */
-export function AuthorPanel({ docId, status, canManage, canEdit }: Props) {
+export function AuthorPanel({ docId, status, canManage, canEdit, queueList }: Props) {
   const { run, pending } = useVaultAction();
   const vaultId = useVaultId();
   const urls = useVaultUrls();
@@ -39,7 +41,7 @@ export function AuthorPanel({ docId, status, canManage, canEdit }: Props) {
           </button>
         )}
         {canEdit && (
-          <Link href={urls.edit(docId)} className={buttonClass('secondary', 'md', full)}>
+          <Link href={queueList === undefined ? urls.edit(docId) : urls.reviewEdit(docId, queueList || undefined)} className={buttonClass('secondary', 'md', full)}>
             <Icon name="edit" />
             Edit draft
           </Link>

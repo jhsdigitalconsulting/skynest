@@ -1,5 +1,6 @@
 'use client';
 
+import { FIELD_TEXTAREA } from '../field-styles';
 import { useState } from 'react';
 import { commentAction } from '@/app/vault/actions';
 import { buttonClass } from '../button-styles';
@@ -26,7 +27,7 @@ export function CommentBox({ docId }: { docId: string }) {
         }}
         placeholder="Leave a comment…"
         aria-label="Comment"
-        className="block w-full rounded-lg border-0 text-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500"
+        className={FIELD_TEXTAREA}
       />
       <div className="mt-2 flex items-center justify-between">
         <span className="text-xs text-gray-400">⌘ Enter to send</span>

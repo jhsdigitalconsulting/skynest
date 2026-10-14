@@ -1,6 +1,7 @@
 import { put, del, list, head, get, BlobNotFoundError } from '@vercel/blob';
 import type { StorageProvider } from '@promptowl/contextnest-engine';
 import { StorageConflictError } from '@promptowl/contextnest-engine';
+import { withBlobRetry } from './retry';
 
 export interface BlobStorageConfig {
   /** Top-level namespace prefix, e.g. "vault". Read from CONTEXTNEST_BLOB_PREFIX env var. */
@@ -28,9 +29,12 @@ export class BlobStorageProvider implements StorageProvider {
     // read -> bump version -> write in one process; a stale read there silently
     // clobbers the just-written body with the old one (new version, old body).
     // Origin reads keep read-after-write consistent for these write paths.
-    const result = await get(this.key(path), { access: 'private', useCache: false });
-    if (!result || !result.stream) return null;
-    return Buffer.from(await new Response(result.stream).arrayBuffer());
+    // Origin reads are rate limited and occasionally 5xx, so retry those (see retry.ts).
+    return withBlobRetry(async () => {
+      const result = await get(this.key(path), { access: 'private', useCache: false });
+      if (!result || !result.stream) return null;
+      return Buffer.from(await new Response(result.stream).arrayBuffer());
+    });
   }
 
   async write(path: string, data: Buffer, _options?: { sync?: boolean }): Promise<void> {
@@ -69,7 +73,7 @@ export class BlobStorageProvider implements StorageProvider {
     const results: string[] = [];
     let cursor: string | undefined;
     do {
-      const result = await list({ prefix: this.key(prefix), cursor });
+      const result = await withBlobRetry(() => list({ prefix: this.key(prefix), cursor }));
       for (const blob of result.blobs) {
         const path = this.stripPrefix(blob.pathname);
         if (!suffix || path.endsWith(suffix)) {
@@ -83,7 +87,7 @@ export class BlobStorageProvider implements StorageProvider {
 
   async exists(path: string): Promise<boolean> {
     try {
-      await head(this.key(path));
+      await withBlobRetry(() => head(this.key(path)));
       return true;
     } catch (err: unknown) {
       if (err instanceof BlobNotFoundError) return false;
@@ -93,7 +97,7 @@ export class BlobStorageProvider implements StorageProvider {
 
   async stat(path: string): Promise<{ size: number; mtimeMs: number } | null> {
     try {
-      const result = await head(this.key(path));
+      const result = await withBlobRetry(() => head(this.key(path)));
       // uploadedAt should always be present on Vercel Blobs; if it's missing,
       // fail loudly rather than silently fabricate a "now" timestamp that would
       // break staleness caching (making old files appear fresh).

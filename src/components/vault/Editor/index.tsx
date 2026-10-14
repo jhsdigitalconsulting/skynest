@@ -1,5 +1,6 @@
 'use client';
 
+import { tagVocabulary } from '@/lib/vault-ui/tags';
 import { useCallback, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { discardDraftAction, publishNowAction, saveDraftAction, submitForReviewAction } from '@/app/vault/actions';
@@ -58,6 +59,7 @@ export function Editor(props: EditorProps) {
   const vaultId = useVaultId();
   const links = useMemo(() => ({ vaultId, index: props.linkIndex }), [vaultId, props.linkIndex]);
   const urls = useVaultUrls();
+  const tagVocab = useMemo(() => tagVocabulary(props.linkIndex.docs), [props.linkIndex]);
   const [saving, startSave] = useTransition();
 
   const [fields, setFields] = useState<EditorFields>(props.initial);
@@ -165,6 +167,7 @@ export function Editor(props: EditorProps) {
           folder={folder}
           slug={slug}
           folders={props.folders}
+          tagVocabulary={tagVocab}
           disabled={locked}
           onTitleChange={onTitleChange}
           onChange={update}

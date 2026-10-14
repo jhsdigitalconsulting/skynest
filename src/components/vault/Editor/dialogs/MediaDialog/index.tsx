@@ -1,5 +1,6 @@
 'use client';
 
+import { FIELD_INPUT } from '../../../field-styles';
 import { useState } from 'react';
 import type { UploadedAsset } from '@/lib/vault-ui/assets';
 import { uploadAsset } from '@/lib/vault-ui/upload';
@@ -18,8 +19,7 @@ export interface MediaDialogProps {
   onUploaded: (asset: UploadedAsset, alt: string) => void;
 }
 
-const INPUT_CLASS =
-  'mt-1 h-10 w-full rounded-lg border-0 px-3 text-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-500';
+const INPUT_CLASS = `mt-1 ${FIELD_INPUT}`;
 
 /** Upload an image or video into the vault, or embed an image from a URL. */
 export function MediaDialog({ vaultId, onClose, onInsertUrl, onUploaded }: MediaDialogProps) {

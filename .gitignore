@@ -50,3 +50,6 @@ pnpm-debug.log*
 .vercel
 .env*.local
 .env*
+
+# Playwright MCP
+.playwright-mcp/

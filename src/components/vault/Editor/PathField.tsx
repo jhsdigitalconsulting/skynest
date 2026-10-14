@@ -1,7 +1,7 @@
 'use client';
 
 import { Icon } from '../Icon';
-import { FIELD_FRAME, FIELD_LABEL } from './field-styles';
+import { FIELD_FRAME, FIELD_LABEL } from '../field-styles';
 
 interface Props {
   folder: string;

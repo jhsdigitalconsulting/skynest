@@ -1,5 +1,6 @@
 'use client';
 
+import { FIELD_INPUT } from '../../field-styles';
 import { useState } from 'react';
 import { Dialog } from '../../Dialog';
 import { buttonClass } from '../../button-styles';
@@ -13,8 +14,7 @@ export interface TableDialogProps {
   onSubmit: (rows: number, cols: number) => void;
 }
 
-const INPUT_CLASS =
-  'mt-1 h-10 w-full rounded-lg border-0 px-3 text-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-500';
+const INPUT_CLASS = `mt-1 ${FIELD_INPUT}`;
 
 /** A whole number from `raw`, held between 1 and `max`; `fallback` when it isn't a number. */
 export function clampCount(raw: string, max: number, fallback: number): number {

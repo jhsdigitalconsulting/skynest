@@ -4,7 +4,7 @@ import { useId, useMemo, useState } from 'react';
 import { canonicalTag, cleanTag, suggestTags } from '@/lib/vault-ui/tags';
 import type { TagCount } from '@/lib/vault-ui/tags';
 import { Icon } from '../Icon';
-import { FIELD_FRAME } from './field-styles';
+import { FIELD_FRAME } from '../field-styles';
 
 interface Props {
   value: string[];

@@ -2,7 +2,7 @@
 
 import type { EditorFields } from '@/lib/vault-ui/types';
 import { Icon } from '../Icon';
-import { FIELD_INPUT, FIELD_LABEL } from './field-styles';
+import { FIELD_INPUT, FIELD_LABEL } from '../field-styles';
 import { PathField } from './PathField';
 import { TagInput } from './TagInput';
 

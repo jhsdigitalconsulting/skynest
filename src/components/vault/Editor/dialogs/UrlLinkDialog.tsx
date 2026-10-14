@@ -1,5 +1,6 @@
 'use client';
 
+import { FIELD_INPUT } from '../../field-styles';
 import { useState } from 'react';
 import { Dialog } from '../../Dialog';
 import { buttonClass } from '../../button-styles';
@@ -16,8 +17,7 @@ export interface UrlLinkDialogProps {
   onRemove: () => void;
 }
 
-const INPUT_CLASS =
-  'mt-1 h-10 w-full rounded-lg border-0 px-3 text-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-500';
+const INPUT_CLASS = `mt-1 ${FIELD_INPUT}`;
 
 /** `example.com` → `https://example.com`; leaves anything with a scheme, a path or an anchor alone. */
 export function normalizeHref(raw: string): string {

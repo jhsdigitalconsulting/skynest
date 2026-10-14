@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Icon } from '../Icon';
-import { FIELD_FRAME } from './field-styles';
+import { FIELD_FRAME } from '../field-styles';
 
 interface Props {
   value: string[];
@@ -28,7 +28,7 @@ export function TagInput({ value, onChange, disabled }: Props) {
   };
 
   return (
-    <div className={`flex min-h-10 flex-wrap items-center gap-1.5 px-2.5 py-1.5 ${FIELD_FRAME}`}>
+    <div className={`flex min-h-10 flex-wrap items-center gap-1.5 px-3 py-1.5 ${FIELD_FRAME}`}>
       {display.map((tag) => (
         <span key={tag} className="inline-flex items-center gap-1 rounded-md bg-indigo-50 py-0.5 pl-2 pr-1 text-xs font-medium text-indigo-700">
           #{tag}

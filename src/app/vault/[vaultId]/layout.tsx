@@ -13,7 +13,7 @@ import { buttonClass } from '@/components/vault/button-styles';
 import { PAGE_CONTAINER } from '@/components/vault/layout-styles';
 import { Icon } from '@/components/vault/Icon';
 import { getVaultSession } from '@/lib/vault-ui/context';
-import { loadDrafts } from '@/lib/vault-ui/data';
+import { loadDrafts, loadLinkIndex } from '@/lib/vault-ui/data';
 import { vaultUrls } from '@/lib/vault-ui/paths';
 import { findVault, listVaults } from '@/lib/vault/registry';
 import { getGitSource } from '@/lib/vault/sync/git-pull';
@@ -72,7 +72,7 @@ export default async function VaultLayout({ children, params }: LayoutProps) {
   const { viewer } = session;
   const canSync =
     viewer.access === 'write' && (!viewer.reviewRequired || viewer.isReviewer) && getGitSource(vault.id) !== null;
-  const drafts = await loadDrafts(vault.id);
+  const [drafts, linkIndex] = await Promise.all([loadDrafts(vault.id), loadLinkIndex(vault.id)]);
   const login = viewer.login.toLowerCase();
   const reviewCount = drafts.filter((d) => d.status === 'in_review').length;
   const myDraftCount = drafts.filter(
@@ -101,7 +101,7 @@ export default async function VaultLayout({ children, params }: LayoutProps) {
             </Suspense>
             <div className="flex flex-1 justify-end">
               <Suspense fallback={<div className="h-9 w-full max-w-md" />}>
-                <HeaderSearch />
+                <HeaderSearch docs={linkIndex.docs} />
               </Suspense>
             </div>
             {canSync && <GitSyncButton vaultId={vault.id} />}

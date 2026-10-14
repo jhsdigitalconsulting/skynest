@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Icon } from './Icon';
+import { FOCUS_RING } from './button-styles';
+import { usePopoverMenu } from './usePopoverMenu';
 
 interface Props {
   viewer: {
@@ -14,35 +15,24 @@ interface Props {
   };
 }
 
+const ITEM = `block rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-none ${FOCUS_RING}`;
+
 export function UserMenu({ viewer }: Props) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
+  const menu = usePopoverMenu();
   const role = viewer.isReviewer ? 'Reviewer' : viewer.access === 'write' ? 'Editor' : 'Read-only';
   const initial = (viewer.name ?? viewer.login).charAt(0).toUpperCase();
 
   return (
-    <div ref={ref} className="relative shrink-0">
+    <div ref={menu.rootRef} className="relative shrink-0">
       <button
+        ref={menu.triggerRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-label="Account"
-        className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700 ring-2 ring-white hover:ring-indigo-200"
+        onClick={menu.toggle}
+        onKeyDown={menu.onTriggerKeyDown}
+        aria-haspopup="menu"
+        aria-expanded={menu.open}
+        aria-label={`Account: ${viewer.name ?? viewer.login}`}
+        className={`flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700 ring-2 ring-white hover:ring-indigo-200 ${FOCUS_RING}`}
       >
         {viewer.image ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -51,8 +41,14 @@ export function UserMenu({ viewer }: Props) {
           initial
         )}
       </button>
-      {open && (
-        <div className="absolute right-0 mt-2 w-60 rounded-xl bg-white p-1.5 text-sm shadow-lg ring-1 ring-gray-200">
+      {menu.open && (
+        <div
+          ref={menu.menuRef}
+          role="menu"
+          aria-label="Account"
+          onKeyDown={menu.onMenuKeyDown}
+          className="absolute right-0 z-40 mt-2 w-60 rounded-xl bg-white p-1.5 text-sm shadow-lg ring-1 ring-gray-200"
+        >
           <div className="px-3 py-2">
             <p className="truncate font-medium text-gray-900">{viewer.name ?? viewer.login}</p>
             <p className="truncate text-xs text-gray-500">{viewer.login}</p>
@@ -61,16 +57,19 @@ export function UserMenu({ viewer }: Props) {
               {role}
             </span>
           </div>
-          <div className="my-1 border-t border-gray-100" />
-          <Link href="/" className="block rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-50">
+          <div className="my-1 border-t border-gray-100" role="separator" />
+          <Link href="/" role="menuitem" data-menu-item onClick={menu.close} className={ITEM}>
             Skynest home
           </Link>
-          <Link href="/docs" className="block rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-50">
+          <Link href="/docs" role="menuitem" data-menu-item onClick={menu.close} className={ITEM}>
             Connect an MCP client
           </Link>
-          <Link href="/admin" className="block rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-50">
-            Admin
-          </Link>
+          {/* Admin is reviewer-only; other roles would only hit a dead end. */}
+          {viewer.isReviewer && (
+            <Link href="/admin" role="menuitem" data-menu-item onClick={menu.close} className={ITEM}>
+              Admin
+            </Link>
+          )}
         </div>
       )}
     </div>

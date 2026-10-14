@@ -9,7 +9,7 @@ interface Props {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="py-2.5">
-      <dt className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</dt>
+      <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</dt>
       <dd className="mt-1 text-sm text-gray-800">{children}</dd>
     </div>
   );

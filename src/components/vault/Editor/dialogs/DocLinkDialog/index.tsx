@@ -78,11 +78,11 @@ export function DocLinkDialog({ docs, onClose, onPick }: DocLinkDialogProps) {
             onClick={() => pick(doc)}
             className={`flex cursor-pointer gap-3 rounded-lg px-2 py-2 ${i === active ? 'bg-indigo-50' : ''}`}
           >
-            <Icon name="file" className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+            <Icon name="file" className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" />
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium text-gray-900">{titleOf(doc)}</span>
               <span className="block truncate text-xs text-gray-500">
-                {doc.tags.length ? doc.tags.map((t) => `#${t}`).join(' · ') : doc.id}
+                {[doc.id, ...doc.tags.map((t) => `#${t.replace(/^#+/, '')}`)].join(' · ')}
               </span>
             </span>
           </li>

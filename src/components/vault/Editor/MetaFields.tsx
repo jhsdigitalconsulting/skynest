@@ -18,6 +18,9 @@ interface Props {
   /** Tags already used in the vault, for the tag typeahead. */
   tagVocabulary: TagCount[];
   disabled: boolean;
+  /** Validation messages, shown once the user has tried to save. */
+  titleError: string | null;
+  pathError: string | null;
   onTitleChange: (title: string) => void;
   onChange: <K extends keyof EditorFields>(key: K, value: EditorFields[K]) => void;
   onFolderChange: (folder: string) => void;
@@ -42,9 +45,16 @@ export function MetaFields(props: Props) {
         disabled={disabled}
         placeholder="Untitled document"
         aria-label="Title"
+        aria-invalid={props.titleError ? true : undefined}
+        aria-describedby={props.titleError ? 'doc-title-error' : undefined}
         autoFocus={isNew && !pathLocked}
         className="block w-full border-0 bg-transparent p-0 text-2xl font-semibold tracking-tight text-gray-900 placeholder:text-gray-300 focus:outline-none focus:ring-0 disabled:text-gray-500"
       />
+      {props.titleError && (
+        <p id="doc-title-error" className="mt-1 text-sm text-rose-700">
+          {props.titleError}
+        </p>
+      )}
       {pathLocked && <p className="mt-1 font-mono text-xs text-gray-400">{props.docId}.md</p>}
 
       <div className="mt-6 grid items-start gap-x-4 gap-y-5 md:grid-cols-[minmax(0,1fr)_14rem]">
@@ -99,6 +109,7 @@ export function MetaFields(props: Props) {
               folders={props.folders}
               onFolderChange={props.onFolderChange}
               onSlugChange={props.onSlugChange}
+              error={props.pathError}
             />
           </div>
         )}

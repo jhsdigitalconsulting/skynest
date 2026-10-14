@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { vaultUrls } from '@/lib/vault-ui/paths';
+import { FOCUS_RING } from './button-styles';
 
 interface Props {
   vaultId: string;
@@ -14,7 +15,7 @@ export function TypeFilter({ vaultId, types, active, folder, q }: Props) {
   const urls = vaultUrls(vaultId);
   if (types.length < 2) return null;
   const chip = (selected: boolean) =>
-    `inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors ${
+    `inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors ${FOCUS_RING} ${
       selected ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 ring-1 ring-inset ring-gray-200 hover:bg-gray-50'
     }`;
   return (

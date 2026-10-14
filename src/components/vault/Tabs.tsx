@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { FOCUS_RING } from './button-styles';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 
@@ -28,7 +29,7 @@ export function Tabs({ tabs, active }: Props) {
               href={tab.href}
               scroll={false}
               aria-current={selected ? 'page' : undefined}
-              className={`inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-0.5 pb-3 pt-1 text-sm font-medium transition-colors ${
+              className={`inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-0.5 pb-3 pt-1 text-sm font-medium transition-colors ${FOCUS_RING} ${
                 selected
                   ? 'border-indigo-600 text-indigo-700'
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-800'

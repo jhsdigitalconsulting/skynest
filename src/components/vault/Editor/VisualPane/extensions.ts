@@ -118,7 +118,7 @@ export function visualExtensions(placeholder: string, assetSrc: AssetSrc = (src)
     // Inline, so an image can sit inside a paragraph as it can in markdown.
     vaultImage(assetSrc),
     videoPreviews(assetSrc),
-    TableKit.configure({ table: { resizable: false } }),
+    TableKit.configure({ table: { resizable: false, cellMinWidth: 120 } }),
     TaskList,
     TaskItem.configure({ nested: true }),
     Placeholder.configure({ placeholder }),

@@ -6,8 +6,10 @@ import { commentAction } from '@/app/vault/actions';
 import { buttonClass } from '../button-styles';
 import { useVaultAction } from '../useVaultAction';
 import { useVaultId } from '../useVault';
+import { useShortcutLabel } from '../useShortcutLabel';
 
 export function CommentBox({ docId }: { docId: string }) {
+  const keys = useShortcutLabel();
   const [text, setText] = useState('');
   const { run, pending } = useVaultAction();
   const vaultId = useVaultId();
@@ -25,12 +27,13 @@ export function CommentBox({ docId }: { docId: string }) {
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
         }}
+        readOnly={pending}
         placeholder="Leave a comment…"
         aria-label="Comment"
         className={FIELD_TEXTAREA}
       />
       <div className="mt-2 flex items-center justify-between">
-        <span className="text-xs text-gray-400">⌘ Enter to send</span>
+        <span className="text-xs text-gray-400">{keys('⌘ Enter')} to send</span>
         <button type="button" onClick={send} disabled={pending || !text.trim()} className={buttonClass('secondary', 'sm')}>
           Comment
         </button>

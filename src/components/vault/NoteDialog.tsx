@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Dialog } from './Dialog';
 import { buttonClass } from './button-styles';
 import type { ButtonVariant } from './button-styles';
+import { useShortcutLabel } from './useShortcutLabel';
 
 interface Props {
   open: boolean;
@@ -26,6 +27,7 @@ interface Props {
 
 /** A confirm dialog with a free-text note — used for submit, approve and request changes. */
 export function NoteDialog(props: Props) {
+  const keys = useShortcutLabel();
   const [note, setNote] = useState('');
   useEffect(() => {
     if (props.open) setNote('');
@@ -68,7 +70,7 @@ export function NoteDialog(props: Props) {
         placeholder={props.placeholder}
         className={`mt-1.5 ${FIELD_TEXTAREA}`}
       />
-      <p className="mt-1.5 text-xs text-gray-400">⌘ Enter to confirm</p>
+      <p className="mt-1.5 text-xs text-gray-400">{keys('⌘ Enter')} to confirm</p>
       {props.extra}
     </Dialog>
   );

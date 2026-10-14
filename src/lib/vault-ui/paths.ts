@@ -34,6 +34,8 @@ export function vaultUrls(vaultId: string) {
     asset: (file: string) => `${root}/assets/${encodeURIComponent(file)}`,
     edit: (id: string) => `${root}/edit/${encodeId(id)}`,
     newDoc: (folder?: string) => (folder ? `${root}/new?folder=${encodeURIComponent(folder)}` : `${root}/new`),
+    /** The vault's CONTEXT.md operating instructions. */
+    context: `${root}/context`,
     review: (tab?: string) => (tab ? `${root}/review?tab=${tab}` : `${root}/review`),
     reviewDraft: (id: string, tab?: 'preview' | 'current') =>
       `${root}/review/${encodeId(id)}${tab ? `?tab=${tab}` : ''}`,

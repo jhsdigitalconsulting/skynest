@@ -211,3 +211,16 @@ export async function restoreVersionAction(vaultId: string, docId: string, versi
     };
   });
 }
+
+/** Overwrite the vault's CONTEXT.md. It's the vault-level system prompt, so only reviewers may change it. */
+export async function saveContextMdAction(vaultId: string, content: string): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireWriter();
+    if (!viewer.isReviewer) {
+      return { ok: false, error: 'Only reviewers can edit the vault instructions.', code: 'forbidden' };
+    }
+    const { storage } = engineFor(viewer, vaultId);
+    await storage.writeContextMd(content);
+    return { ok: true, message: 'Vault instructions saved' };
+  });
+}

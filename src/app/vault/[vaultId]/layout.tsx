@@ -93,7 +93,11 @@ export default async function VaultLayout({ children, params }: LayoutProps) {
               <VaultSwitcher vaults={listVaults()} currentId={vault.id} />
             </div>
             <Suspense fallback={<div className="h-9 w-64" />}>
-              <VaultNav reviewCount={viewer.isReviewer ? reviewCount : 0} myDraftCount={myDraftCount} />
+              <VaultNav
+                reviewCount={viewer.isReviewer ? reviewCount : 0}
+                myDraftCount={myDraftCount}
+                canEditContext={viewer.isReviewer}
+              />
             </Suspense>
             <div className="flex flex-1 justify-end">
               <Suspense fallback={<div className="h-9 w-full max-w-md" />}>

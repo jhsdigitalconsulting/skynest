@@ -9,6 +9,8 @@ import { useVaultUrls } from './useVault';
 interface Props {
   reviewCount: number;
   myDraftCount: number;
+  /** Reviewers get a link to the vault's CONTEXT.md editor. */
+  canEditContext: boolean;
 }
 
 interface NavItem {
@@ -20,7 +22,7 @@ interface NavItem {
   highlight?: boolean;
 }
 
-export function VaultNav({ reviewCount, myDraftCount }: Props) {
+export function VaultNav({ reviewCount, myDraftCount, canEditContext }: Props) {
   const urls = useVaultUrls();
   const pathname = usePathname();
   const tab = useSearchParams().get('tab');
@@ -48,6 +50,16 @@ export function VaultNav({ reviewCount, myDraftCount }: Props) {
       count: myDraftCount,
       active: (inReview && tab === 'mine') || pathname.startsWith(`${urls.root}/edit`),
     },
+    ...(canEditContext
+      ? [
+          {
+            href: urls.context,
+            label: 'Instructions',
+            icon: 'file' as const,
+            active: pathname === urls.context,
+          },
+        ]
+      : []),
   ];
 
   return (

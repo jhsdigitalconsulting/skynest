@@ -42,6 +42,8 @@ export interface EditorProps {
   lockedReason: string | null;
   /** Every linkable document: resolves `[[wikilinks]]` in the preview and feeds the document picker. */
   linkIndex: LinkIndex;
+  /** Set when the editor sits in the review queue's right pane: the queue tab to go back to. */
+  queueList?: string;
 }
 
 interface Backup {
@@ -166,7 +168,8 @@ export function Editor(props: EditorProps) {
     setDialog(next);
   };
 
-  const input = () => ({ docId, isNew: props.isNew, fields, expectedRevision: revision });
+  const inQueue = props.queueList !== undefined;
+  const input = () => ({ docId, isNew: props.isNew, fields, expectedRevision: revision, queueList: props.queueList });
 
   const save = () => {
     if (locked || pending || !dirty || !check()) return;
@@ -209,12 +212,16 @@ export function Editor(props: EditorProps) {
   const cancel = () => {
     if (dirty && !window.confirm('Discard your unsaved changes?')) return;
     removeBackup(backupKey);
+    if (inQueue) {
+      router.push(urls.reviewDraft(docId, undefined, props.queueList || undefined));
+      return;
+    }
     router.push(pathLocked ? urls.doc(docId) : urls.browse({ folder: props.defaultFolder || undefined }));
   };
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
-      <div className={`${PAGE_CONTAINER} flex-1 py-6`}>
+      <div className={`${inQueue ? 'px-4 sm:px-6 lg:px-8' : PAGE_CONTAINER} flex-1 py-6`}>
         {backup.offer && !locked && (
           <RestoreBanner savedAt={backup.offer.savedAt} onRestore={restore} onDismiss={backup.dismissOffer} />
         )}
@@ -275,6 +282,7 @@ export function Editor(props: EditorProps) {
         status={props.status}
         isReviewer={props.isReviewer}
         canSave={!locked}
+        containerClass={inQueue ? 'px-4 sm:px-6 lg:px-8' : undefined}
         onSave={save}
         onSubmit={() => openDialog('submit')}
         onPublish={() => openDialog('publish')}

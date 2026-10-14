@@ -14,13 +14,15 @@ import { DraftStatusBadge, NewBadge, TypeBadge } from '@/components/vault/Status
 import { Tabs } from '@/components/vault/Tabs';
 import { buttonClass } from '@/components/vault/button-styles';
 import { engineFor, requireViewer } from '@/lib/vault-ui/context';
-import { loadLinkIndex } from '@/lib/vault-ui/data';
+import { Editor } from '@/components/vault/Editor';
+import { draftLockReason, loadFolders } from '@/lib/vault-ui/editor-data';
+import { folderOf, loadLinkIndex } from '@/lib/vault-ui/data';
 import { parseSnapshot, snapshotOf } from '@/lib/vault-ui/doc-data';
 import { decodeSegments, vaultUrls } from '@/lib/vault-ui/paths';
 
 interface Props {
   params: Promise<{ vaultId: string; path: string[] }>;
-  searchParams: Promise<{ tab?: string; list?: string }>;
+  searchParams: Promise<{ tab?: string; list?: string; edit?: string }>;
 }
 
 export async function generateMetadata({ params }: Props) {
@@ -34,7 +36,7 @@ function involves(draft: Draft, login: string): boolean {
 }
 
 export default async function ReviewDraftPage({ params, searchParams }: Props) {
-  const [{ vaultId, path }, { tab, list }] = await Promise.all([params, searchParams]);
+  const [{ vaultId, path }, { tab, list, edit }] = await Promise.all([params, searchParams]);
   const urls = vaultUrls(vaultId);
   const docId = decodeSegments(path);
   const viewer = await requireViewer();
@@ -64,6 +66,26 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
     );
   }
 
+  if (edit === '1' && viewer.access === 'write') {
+    const folders = await loadFolders(vaultId);
+    return (
+      <Editor
+        key={docId}
+        docId={docId}
+        isNew={draft.isNew}
+        initial={parseSnapshot(docId, draft.content)}
+        revision={draft.revision}
+        status={draft.status}
+        isReviewer={viewer.isReviewer}
+        defaultFolder={folderOf(docId)}
+        folders={folders}
+        lockedReason={draftLockReason(draft, viewer)}
+        linkIndex={linkIndex}
+        queueList={list ?? ''}
+      />
+    );
+  }
+
   const after = parseSnapshot(docId, draft.content);
   const before = node ? snapshotOf(node) : null;
   const liveVersion = node?.frontmatter.version ?? null;
@@ -87,6 +109,7 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
       isReviewer={viewer.isReviewer}
       canManage={canManage}
       staleReason={staleReason}
+      queueList={list ?? ''}
     />
   );
 

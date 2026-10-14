@@ -12,6 +12,8 @@ export interface ReviewActionsProps {
   isReviewer: boolean;
   canManage: boolean;
   staleReason: string | null;
+  /** Set on the review page: the queue tab, so Edit draft stays inside the queue. */
+  queueList?: string;
 }
 
 const HEADLINE: Record<DraftStatus, { title: string; body: string }> = {
@@ -25,7 +27,7 @@ const HEADLINE: Record<DraftStatus, { title: string; body: string }> = {
 
 /** The action card on the review page — what this viewer can do with the draft right now. */
 export function ReviewActions(props: ReviewActionsProps) {
-  const { docId, status, revision, canWrite, isReviewer, canManage, staleReason } = props;
+  const { docId, status, revision, canWrite, isReviewer, canManage, staleReason, queueList } = props;
   const headline = HEADLINE[status];
   const reviewing = isReviewer && status === 'in_review';
   const canEdit = canWrite && (status !== 'in_review' || canManage);
@@ -47,7 +49,7 @@ export function ReviewActions(props: ReviewActionsProps) {
           {reviewing && <ReviewerPanel docId={docId} revision={revision} staleReason={staleReason} />}
           {(canManage || canEdit) && (
             <div className={reviewing ? 'border-t border-gray-100 pt-2' : ''}>
-              <AuthorPanel docId={docId} status={status} canManage={canManage} canEdit={canEdit} />
+              <AuthorPanel docId={docId} status={status} canManage={canManage} canEdit={canEdit} queueList={queueList} />
             </div>
           )}
           {status === 'in_review' && !isReviewer && !canManage && (

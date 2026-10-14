@@ -41,6 +41,12 @@ export function vaultUrls(vaultId: string) {
     settings: `${root}/settings`,
     review: (tab?: string) => (tab ? `${root}/review?tab=${tab}` : `${root}/review`),
     /** `tab` picks the preview/changes/published view; `list` keeps the queue's left-hand tab. */
+    /** The editor inside the review pane, so the queue stays on screen while you edit. */
+    reviewEdit: (id: string, list?: string) => {
+      const params = new URLSearchParams({ edit: '1' });
+      if (list) params.set('list', list);
+      return `${root}/review/${encodeId(id)}?${params.toString()}`;
+    },
     reviewDraft: (id: string, tab?: 'changes' | 'current', list?: string) => {
       const params = new URLSearchParams();
       if (tab) params.set('tab', tab);

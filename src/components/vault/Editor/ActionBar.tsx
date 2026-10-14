@@ -22,6 +22,8 @@ interface Props {
   onPublish: () => void;
   onCancel: () => void;
   onDiscard: (() => void) | null;
+  /** Replaces the page container where the bar sits in a pane rather than a full page. */
+  containerClass?: string;
 }
 
 function statusText(dirty: boolean, revision: number | null, status: DraftStatus | null): string {
@@ -40,7 +42,7 @@ export function ActionBar(props: Props) {
   const inReview = status === 'in_review';
   return (
     <div className="sticky bottom-0 z-20 border-t border-gray-200 bg-white/95 backdrop-blur">
-      <div className={`${PAGE_CONTAINER} flex flex-wrap items-center gap-3 py-3`}>
+      <div className={`${props.containerClass ?? PAGE_CONTAINER} flex flex-wrap items-center gap-3 py-3`}>
         {error && !pending ? (
           <p role="alert" className="flex min-w-0 items-center gap-2 text-sm text-red-700">
             <Icon name="alert" className="h-4 w-4 shrink-0" />

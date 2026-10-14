@@ -76,6 +76,21 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
       ? [...draft.activity].reverse().find((a) => a.kind === 'changes_requested')
       : undefined;
 
+  // The note the author left when they last sent it for review.
+  const submitNote = [...draft.activity].reverse().find((a) => a.kind === 'submitted');
+
+  const actions = (
+    <ReviewActions
+      docId={docId}
+      status={draft.status}
+      revision={draft.revision}
+      canWrite={canWrite}
+      isReviewer={viewer.isReviewer}
+      canManage={canManage}
+      staleReason={staleReason}
+    />
+  );
+
   const active = tab === 'preview' ? 'preview' : tab === 'current' && node ? 'current' : 'changes';
   const others = draft.contributors.filter((c) => c !== draft.author);
 
@@ -91,7 +106,7 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{after.title || docId}</h1>
+        <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight text-gray-900 [overflow-wrap:anywhere]">{after.title || docId}</h1>
         <DraftStatusBadge status={draft.status} />
         {draft.isNew && <NewBadge />}
         {after.type !== 'document' && <TypeBadge type={after.type} />}
@@ -101,6 +116,11 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
         {others.length > 0 && <> with {others.join(', ')}</>}
         {draft.isNew ? ' · new document' : ` · based on v${draft.baseVersion ?? '–'}`}
         {' · '}revision {draft.revision}
+        {submitNote && (
+          <>
+            {' · '}submitted <RelativeTime iso={submitNote.at} />
+          </>
+        )}
         {' · '}updated <RelativeTime iso={draft.updatedAt} />
         {node && (
           <>
@@ -111,6 +131,18 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
           </>
         )}
       </p>
+
+      {submitNote?.message && !lastFeedback?.message && (
+        <div className="mt-5 flex gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+          <Icon name="send" className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
+          <div className="min-w-0 text-sm">
+            <p className="font-medium text-indigo-900">
+              {submitNote.actor}&rsquo;s note <span className="font-normal text-indigo-700">· submitted <RelativeTime iso={submitNote.at} /></span>
+            </p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-indigo-900">{submitNote.message}</p>
+          </div>
+        </div>
+      )}
 
       {lastFeedback?.message && (
         <div className="mt-5 flex gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
@@ -123,6 +155,9 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
           </div>
         </div>
       )}
+
+      {/* On small screens the sidebar falls below the diff, so show the actions up front too. */}
+      <div className="mt-5 lg:hidden">{actions}</div>
 
       <div className="mt-6">
         <Tabs
@@ -153,22 +188,14 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
                 return shown.body.trim() ? (
                   <Markdown source={shown.body} links={{ vaultId, index: linkIndex }} />
                 ) : (
-                  <p className="text-center text-sm text-gray-400">No content.</p>
+                  <p className="text-center text-sm text-gray-500">No content.</p>
                 );
               })()}
             </article>
           )}
         </div>
-        <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-          <ReviewActions
-            docId={docId}
-            status={draft.status}
-            revision={draft.revision}
-            canWrite={canWrite}
-            isReviewer={viewer.isReviewer}
-            canManage={canManage}
-            staleReason={staleReason}
-          />
+        <aside className="space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto">
+          <div className="hidden lg:block">{actions}</div>
           <ActivityThread docId={docId} activity={draft.activity} canComment={canWrite} />
         </aside>
       </div>

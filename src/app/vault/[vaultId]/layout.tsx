@@ -83,7 +83,7 @@ export default async function VaultLayout({ children, params }: LayoutProps) {
     <Toaster>
       <div className="flex min-h-screen flex-col bg-gray-50">
         <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/90 backdrop-blur">
-          <div className={`${PAGE_CONTAINER} flex h-14 items-center gap-4`}>
+          <div className={`${PAGE_CONTAINER} flex h-14 items-center gap-2 sm:gap-4`}>
             <div className="flex min-w-0 shrink-0 items-center gap-2">
               <Link href={urls.browse()} className="shrink-0" aria-label="Skynest home">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -99,16 +99,16 @@ export default async function VaultLayout({ children, params }: LayoutProps) {
                 canEditContext={viewer.isReviewer}
               />
             </Suspense>
-            <div className="flex flex-1 justify-end">
+            <div className="flex min-w-0 flex-1 justify-end">
               <Suspense fallback={<div className="h-9 w-full max-w-md" />}>
                 <HeaderSearch docs={linkIndex.docs} />
               </Suspense>
             </div>
             {canSync && <GitSyncButton vaultId={vault.id} />}
             {viewer.access === 'write' && (
-              <Link href={urls.newDoc()} className={buttonClass('primary', 'md', 'shrink-0')}>
+              <Link href={urls.newDoc()} aria-label="New document" title="New document" className={buttonClass('primary', 'md', 'shrink-0')}>
                 <Icon name="plus" />
-                <span className="hidden lg:inline">New document</span>
+                <span className="hidden lg:inline" aria-hidden>New document</span>
               </Link>
             )}
             <UserMenu viewer={{ login: viewer.login, name: viewer.name, image: viewer.image, access: viewer.access, isReviewer: viewer.isReviewer }} />

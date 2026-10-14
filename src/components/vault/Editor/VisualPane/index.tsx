@@ -59,6 +59,9 @@ export function VisualPane({ value, onChange, disabled, controls, links }: Visua
     immediatelyRender: false,
     editable: !disabled,
     editorProps: {
+      // Keep the cursor clear of the sticky header + toolbar above and the action bar below.
+      scrollMargin: { top: 128, bottom: 96, left: 0, right: 0 },
+      scrollThreshold: { top: 128, bottom: 96, left: 0, right: 0 },
       attributes: {
         class: `${PROSE_CLASS} visual-editor min-h-[480px] px-6 py-5 sm:px-8 focus:outline-none`,
         'aria-label': 'Document body',

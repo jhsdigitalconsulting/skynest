@@ -11,7 +11,7 @@ import { RestoreVersionButton } from '@/components/vault/RestoreVersionButton';
 import { DocStatusBadge, TypeBadge } from '@/components/vault/StatusBadge';
 import { Tabs } from '@/components/vault/Tabs';
 import { VersionHistory } from '@/components/vault/VersionHistory';
-import { buttonClass } from '@/components/vault/button-styles';
+import { FOCUS_RING, buttonClass } from '@/components/vault/button-styles';
 import { PAGE_CONTAINER } from '@/components/vault/layout-styles';
 import { engineFor, requireViewer } from '@/lib/vault-ui/context';
 import { loadLinkIndex } from '@/lib/vault-ui/data';
@@ -59,7 +59,7 @@ export default async function DocPage({ params, searchParams }: Props) {
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{fm.title || docId}</h1>
+            <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight text-gray-900 [overflow-wrap:anywhere]">{fm.title || docId}</h1>
             <DocStatusBadge status={fm.status ?? 'draft'} version={fm.version} />
             {fm.type && fm.type !== 'document' && <TypeBadge type={fm.type} />}
           </div>
@@ -70,7 +70,7 @@ export default async function DocPage({ params, searchParams }: Props) {
                 <Link
                   key={tag}
                   href={urls.browse({ q: tag })}
-                  className="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600 hover:bg-indigo-50 hover:text-indigo-700"
+                  className={`rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 ${FOCUS_RING}`}
                 >
                   {tag}
                 </Link>
@@ -80,12 +80,6 @@ export default async function DocPage({ params, searchParams }: Props) {
         </div>
         {canWrite && (
           <div className="flex shrink-0 gap-2">
-            {draft ? (
-              <Link href={urls.reviewDraft(docId)} className={buttonClass('secondary')}>
-                <Icon name="diff" />
-                View draft
-              </Link>
-            ) : null}
             <Link href={urls.edit(docId)} className={buttonClass('primary')}>
               <Icon name="edit" />
               {draft ? 'Edit draft' : 'Edit'}
@@ -122,7 +116,7 @@ export default async function DocPage({ params, searchParams }: Props) {
               {node.body.trim() ? (
                 <Markdown source={node.body} links={{ vaultId, index: linkIndex }} />
               ) : (
-                <p className="text-center text-sm text-gray-400">This document has no content yet.</p>
+                <p className="text-center text-sm text-gray-500">This document has no content yet.</p>
               )}
             </article>
           ) : selectedVersion !== null ? (

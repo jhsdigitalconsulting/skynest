@@ -56,7 +56,7 @@ export function Preview({ summary, prune, onPruneChange }: Props) {
           <span>Also delete the {deletions} file{deletions === 1 ? '' : 's'} Git no longer has (backed up first). Off by default.</span>
         </label>
       )}
-      <p className="text-xs text-gray-400">Documents created only in the vault and all drafts are never touched.</p>
+      <p className="text-xs text-gray-500">Documents created only in the vault and all drafts are never touched.</p>
     </div>
   );
 }

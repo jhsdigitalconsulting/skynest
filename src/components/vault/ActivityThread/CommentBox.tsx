@@ -25,6 +25,7 @@ export function CommentBox({ docId }: { docId: string }) {
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
         }}
+        readOnly={pending}
         placeholder="Leave a comment…"
         aria-label="Comment"
         className={FIELD_TEXTAREA}

@@ -1,4 +1,5 @@
 import { Icon } from '../Icon';
+import { FOCUS_RING } from '../button-styles';
 
 interface Props {
   count: number;
@@ -13,7 +14,7 @@ export function GapRow({ count, colSpan, onExpand }: Props) {
         <button
           type="button"
           onClick={onExpand}
-          className="flex w-full items-center gap-2 px-3 py-1 text-left font-sans text-xs text-indigo-600 hover:bg-indigo-50"
+          className={`flex w-full items-center gap-2 px-3 py-1 text-left font-sans text-xs text-indigo-700 hover:bg-indigo-50 ${FOCUS_RING} focus-visible:ring-inset`}
         >
           <Icon name="chevronDown" className="h-3.5 w-3.5" />
           Show {count} unchanged {count === 1 ? 'line' : 'lines'}

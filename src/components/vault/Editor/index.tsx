@@ -68,6 +68,8 @@ export function Editor(props: EditorProps) {
   const [mode, setMode] = useState<EditorMode>('visual');
   const [dialog, setDialog] = useState<SubmitMode | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // The last save failure, kept on screen until the next successful save.
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const pathLocked = props.docId !== null;
   const [folder, setFolder] = useState(props.defaultFolder);
@@ -119,8 +121,10 @@ export function Editor(props: EditorProps) {
       const result = await saveDraftAction(vaultId, input());
       if (!result.ok) {
         toast.show(result.error, 'error');
+        setSaveError(result.error);
         return;
       }
+      setSaveError(null);
       setSaved(fields);
       setRevision(result.revision ?? null);
       toast.show('Draft saved');
@@ -203,6 +207,8 @@ export function Editor(props: EditorProps) {
         dirty={dirty}
         pending={pending}
         revision={revision}
+        error={saveError}
+        canSubmit={dirty || revision !== null}
         status={props.status}
         isReviewer={props.isReviewer}
         canSave={!locked}
@@ -244,9 +250,7 @@ export function Editor(props: EditorProps) {
             </button>
           </>
         }
-      >
-        {null}
-      </Dialog>
+      />
     </div>
   );
 }

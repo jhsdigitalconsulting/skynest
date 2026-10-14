@@ -76,10 +76,11 @@ export function GitSyncButton({ vaultId }: GitSyncButtonProps) {
         onClick={openDialog}
         className={buttonClass('secondary', 'md', 'relative shrink-0')}
         title={ahead ? 'Git has changes the vault does not' : 'Sync from Git'}
+        aria-label={ahead ? 'Sync from Git (Git has new changes)' : 'Sync from Git'}
       >
         <Icon name="redo" />
         <span className="hidden lg:inline">Sync from Git</span>
-        {ahead && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-white" aria-label="Git is ahead" />}
+        {ahead && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-white" aria-hidden="true" />}
       </button>
       <Dialog
         open={open}
@@ -92,7 +93,8 @@ export function GitSyncButton({ vaultId }: GitSyncButtonProps) {
             </button>
             <button
               type="button"
-              className={buttonClass('primary')}
+              // Removing documents can't be undone, so make that version of the button look like it.
+              className={buttonClass(prune ? 'danger' : 'primary')}
               disabled={pending || !summary || (!summary.hasChanges && !prune)}
               onClick={sync}
             >

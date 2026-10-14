@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { FolderNode } from '@/lib/vault-ui/types';
 import { useFolderActions } from './FolderActions';
 import { Icon } from './Icon';
+import { FOCUS_RING } from './button-styles';
 import { useVaultUrls } from './useVault';
 
 interface Props {
@@ -55,15 +56,15 @@ function FolderRow({ node, depth, activeFolder, canWrite }: { node: FolderNode; 
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className={`flex h-7 w-6 shrink-0 items-center justify-center text-gray-400 ${hasChildren ? '' : 'invisible'}`}
+          className={`flex h-7 w-6 shrink-0 items-center justify-center rounded text-gray-500 ${FOCUS_RING} ${hasChildren ? '' : 'invisible'}`}
           aria-label={open ? `Collapse ${node.name}` : `Expand ${node.name}`}
         >
           <Icon name={open ? 'chevronDown' : 'chevronRight'} className="h-3.5 w-3.5" />
         </button>
-        <Link href={urls.browse({ folder: node.path })} className="flex min-w-0 flex-1 items-center gap-2 py-1 pr-2">
+        <Link href={urls.browse({ folder: node.path })} className={`flex min-w-0 flex-1 items-center gap-2 rounded py-1 pr-2 ${FOCUS_RING}`}>
           <Icon name="folder" className={`h-4 w-4 shrink-0 ${active ? 'text-indigo-500' : 'text-gray-400'}`} />
           <span className="truncate">{node.name}</span>
-          <span className="ml-auto text-xs tabular-nums text-gray-400">{node.count}</span>
+          <span className="ml-auto text-xs tabular-nums text-gray-500">{node.count}</span>
         </Link>
       </div>
       {open && hasChildren && (
@@ -96,13 +97,13 @@ export function FolderTree({ root, activeFolder, canWrite }: Props) {
     >
       <Link
         href={urls.browse()}
-        className={`mb-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium ${
+        className={`mb-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium ${FOCUS_RING} ${
           allActive ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-100'
         }`}
       >
         <Icon name="layers" className="h-4 w-4" />
         All documents
-        <span className="ml-auto text-xs tabular-nums text-gray-400">{root.count}</span>
+        <span className="ml-auto text-xs tabular-nums text-gray-500">{root.count}</span>
       </Link>
       <ul>
         {root.children.map((child) => (

@@ -49,7 +49,7 @@ function Side({ line, side }: { line: DiffLine | null; side: 'old' | 'new' }) {
   return (
     <>
       <td className={`w-10 select-none px-2 text-right align-top text-xs ${GUTTER_BG[line.kind]}`}>{no ?? ''}</td>
-      <td className={`w-1/2 whitespace-pre-wrap break-words border-r border-gray-100 px-3 align-top text-gray-800 ${ROW_BG[line.kind]}`}>
+      <td className={`w-1/2 whitespace-pre-wrap break-words border-r [overflow-wrap:anywhere] border-gray-100 px-3 align-top text-gray-800 ${ROW_BG[line.kind]}`}>
         <LineText line={line} />
       </td>
     </>

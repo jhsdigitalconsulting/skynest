@@ -62,7 +62,7 @@ export default async function BrowsePage({ params, searchParams }: Props) {
     <div className={`${PAGE_CONTAINER} flex gap-8 py-6`}>
       <aside className="hidden w-60 shrink-0 lg:block">
         <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-1">
-          <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Folders</p>
+          <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Folders</p>
           <FolderTree root={tree} activeFolder={folder} canWrite={canWrite} />
         </div>
       </aside>
@@ -111,6 +111,20 @@ export default async function BrowsePage({ params, searchParams }: Props) {
             </div>
           )}
         </div>
+
+        {/* The sidebar tree is desktop-only; smaller screens get it behind a disclosure. */}
+        {tree.children.length > 0 && (
+          <details className="mb-4 rounded-xl bg-white shadow-sm ring-1 ring-gray-200 lg:hidden">
+            <summary className="flex h-10 cursor-pointer items-center gap-2 px-3 text-sm font-medium text-gray-700">
+              <Icon name="folder" className="h-4 w-4 text-gray-500" />
+              Folders
+              <span className="ml-auto truncate text-xs font-normal text-gray-500">{crumbs.at(-1) ?? 'All documents'}</span>
+            </summary>
+            <div className="border-t border-gray-100 p-2">
+              <FolderTree root={tree} activeFolder={folder} canWrite={canWrite} />
+            </div>
+          </details>
+        )}
 
         <div className="mb-4">
           <TypeFilter vaultId={vaultId} types={types} active={type ?? null} folder={folder || undefined} q={query || undefined} />

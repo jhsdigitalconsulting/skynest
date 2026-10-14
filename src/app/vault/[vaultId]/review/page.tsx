@@ -162,7 +162,7 @@ export default async function ReviewQueuePage({ params, searchParams }: Props) {
                 <Link href={urls.doc(s.document_id)} className="min-w-0 flex-1 truncate text-gray-800 hover:text-indigo-700">
                   {s.title ?? s.document_id}
                 </Link>
-                <RelativeTime iso={s.detected_at} className="shrink-0 text-xs text-gray-400" />
+                <RelativeTime iso={s.detected_at} className="shrink-0 text-xs text-gray-500" />
               </li>
             ))}
           </ul>

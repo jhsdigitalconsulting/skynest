@@ -30,8 +30,11 @@ export function MarkdownPane({ value, onChange, mode, onModeChange, disabled, li
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // Collapsing to 'auto' to measure briefly shortens the page; keep the scroll position so it doesn't jump.
+    const y = window.scrollY;
     el.style.height = 'auto';
     el.style.height = `${Math.max(el.scrollHeight, 480)}px`;
+    if (window.scrollY !== y) window.scrollTo(0, y);
   }, [value, mode]);
 
   const run = useCallback(
@@ -72,13 +75,13 @@ export function MarkdownPane({ value, onChange, mode, onModeChange, disabled, li
   const showPreview = mode !== 'write';
 
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
+    <div className="overflow-clip rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
       <div className="sticky top-14 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white/95 px-2 py-1.5 backdrop-blur">
         <Toolbar onCommand={run} onDocLink={() => setPicking(true)} disabled={disabled || mode === 'preview'} />
         <ModeSwitch mode={mode} onChange={onModeChange} />
       </div>
-      <div className={mode === 'split' ? 'grid lg:grid-cols-2 lg:divide-x lg:divide-gray-200' : ''}>
-        <div className={showEditor ? '' : 'hidden'}>
+      <div className={mode === 'split' ? 'grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:divide-x lg:divide-gray-200' : ''}>
+        <div className={showEditor ? 'min-w-0' : 'hidden'}>
           <textarea
             ref={ref}
             value={value}
@@ -92,8 +95,8 @@ export function MarkdownPane({ value, onChange, mode, onModeChange, disabled, li
           />
         </div>
         {showPreview && (
-          <div className="min-h-[480px] px-6 py-5 sm:px-8">
-            {value.trim() ? <Markdown source={value} links={links} /> : <p className="text-sm text-gray-400">Nothing to preview yet.</p>}
+          <div className="min-h-[480px] min-w-0 px-6 py-5 sm:px-8">
+            {value.trim() ? <Markdown source={value} links={links} /> : <p className="text-sm text-gray-500">Nothing to preview yet.</p>}
           </div>
         )}
       </div>

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { DocSnapshot } from '@/lib/vault-ui/types';
 import { Icon } from '../Icon';
+import { FOCUS_RING } from '../button-styles';
 import { collapse, computeDiff } from './compute';
 import type { DiffRow } from './compute';
 import { MetaChanges } from './MetaChanges';
@@ -56,7 +57,7 @@ export function DiffView({ before, after, beforeLabel, afterLabel }: DiffViewPro
       type="button"
       onClick={() => choose(m)}
       aria-pressed={mode === m}
-      className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium ${
+      className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium ${FOCUS_RING} ${
         mode === m ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'
       }`}
     >
@@ -72,8 +73,8 @@ export function DiffView({ before, after, beforeLabel, afterLabel }: DiffViewPro
           <span className="truncate">{beforeLabel}</span>
           <Icon name="chevronRight" className="h-3.5 w-3.5 shrink-0 text-gray-400" />
           <span className="truncate font-medium text-gray-900">{afterLabel}</span>
-          <span className="ml-2 font-mono font-medium text-emerald-600">+{stats.added}</span>
-          <span className="font-mono font-medium text-rose-600">−{stats.removed}</span>
+          <span className="ml-2 font-mono font-medium text-emerald-700">+{stats.added}</span>
+          <span className="font-mono font-medium text-rose-700">−{stats.removed}</span>
         </div>
         <div className="flex rounded-lg bg-gray-200/70 p-0.5">
           {toggle('unified', 'rows', 'Unified')}

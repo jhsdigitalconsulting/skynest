@@ -5,6 +5,7 @@ import { DraftCard } from '@/components/vault/DraftCard';
 import { EmptyState } from '@/components/vault/EmptyState';
 import { Icon } from '@/components/vault/Icon';
 import { RelativeTime } from '@/components/vault/RelativeTime';
+import { SuggestionActions } from '@/components/vault/SuggestionActions';
 import { Tabs } from '@/components/vault/Tabs';
 import { buttonClass } from '@/components/vault/button-styles';
 import { PAGE_CONTAINER } from '@/components/vault/layout-styles';
@@ -34,7 +35,7 @@ const EMPTY: Record<TabKey, { icon: 'inbox' | 'undo' | 'draft'; title: string; b
   },
   drafts: {
     icon: 'draft',
-    title: 'No drafts in progress',
+    title: 'No unsubmitted drafts',
     body: 'Drafts that are still being written, and haven’t been submitted yet, appear here.',
   },
   mine: {
@@ -55,7 +56,7 @@ export default async function ReviewQueuePage({ params, searchParams }: Props) {
   const { tab } = await searchParams;
   const viewer = await requireViewer();
   const [drafts, nodes] = await Promise.all([loadDrafts(vaultId), loadNodes(vaultId)]);
-  const liveVersions = new Map(nodes.map((n) => [n.id, n.frontmatter.version ?? null]));
+  const published = new Map(nodes.map((n) => [n.id, { version: n.frontmatter.version ?? null }]));
 
   const byRecent = (a: DraftSummary, b: DraftSummary) =>
     (b.submittedAt ?? b.updatedAt).localeCompare(a.submittedAt ?? a.updatedAt);
@@ -114,7 +115,7 @@ export default async function ReviewQueuePage({ params, searchParams }: Props) {
           tabs={[
             { key: 'review', label: 'Needs review', icon: 'inbox', href: urls.review(), count: groups.review.length },
             { key: 'changes', label: 'Changes requested', icon: 'undo', href: urls.review('changes'), count: groups.changes.length },
-            { key: 'drafts', label: 'In progress', icon: 'draft', href: urls.review('drafts'), count: groups.drafts.length },
+            { key: 'drafts', label: 'Drafts', icon: 'draft', href: urls.review('drafts'), count: groups.drafts.length },
             { key: 'mine', label: 'Mine', icon: 'user', href: urls.review('mine'), count: groups.mine.length },
           ]}
         />
@@ -124,7 +125,7 @@ export default async function ReviewQueuePage({ params, searchParams }: Props) {
         {list.length ? (
           <ul className="divide-y divide-gray-100 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
             {list.map((d) => (
-              <DraftCard vaultId={vaultId} key={d.docId} draft={d} liveVersion={liveVersions.get(d.docId) ?? null} />
+              <DraftCard vaultId={vaultId} key={d.docId} draft={d} published={published.get(d.docId) ?? null} />
             ))}
           </ul>
         ) : (
@@ -153,16 +154,17 @@ export default async function ReviewQueuePage({ params, searchParams }: Props) {
             <span className="rounded-full bg-gray-100 px-1.5 py-px text-[11px] font-semibold text-gray-600">{suggestions.length}</span>
           </h2>
           <p className="mt-1 text-sm text-gray-500">
-            Proposed by source-drift detection. Review and apply them with the MCP <code className="text-xs">list_suggestions</code> and <code className="text-xs">approve_suggestion</code> tools.
+            Changes proposed by source-drift detection. Open the document to compare, then apply the change (it publishes straight away) or dismiss it.
           </p>
           <ul className="mt-3 divide-y divide-gray-100 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
             {suggestions.map((s) => (
               <li key={s.suggestion_id} className="flex items-center gap-3 px-5 py-3 text-sm">
-                <Icon name="spark" className="h-4 w-4 shrink-0 text-gray-400" />
+                <Icon name="spark" className="h-4 w-4 shrink-0 text-gray-500" />
                 <Link href={urls.doc(s.document_id)} className="min-w-0 flex-1 truncate text-gray-800 hover:text-indigo-700">
                   {s.title ?? s.document_id}
                 </Link>
-                <RelativeTime iso={s.detected_at} className="shrink-0 text-xs text-gray-500" />
+                <RelativeTime iso={s.detected_at} className="hidden shrink-0 text-xs text-gray-500 sm:block" />
+                <SuggestionActions docId={s.document_id} suggestionId={s.suggestion_id} />
               </li>
             ))}
           </ul>

@@ -15,6 +15,7 @@ import { Icon } from '@/components/vault/Icon';
 import { getVaultSession } from '@/lib/vault-ui/context';
 import { loadDrafts, loadLinkIndex } from '@/lib/vault-ui/data';
 import { vaultUrls } from '@/lib/vault-ui/paths';
+import { loadVaultName } from '@/lib/vault-ui/vault-config';
 import { findVault, listVaults } from '@/lib/vault/registry';
 import { getGitSource } from '@/lib/vault/sync/git-pull';
 
@@ -25,7 +26,8 @@ interface LayoutProps {
 
 export async function generateMetadata({ params }: { params: Promise<{ vaultId: string }> }): Promise<Metadata> {
   const { vaultId } = await params;
-  const label = findVault(decodeURIComponent(vaultId))?.label ?? 'Vault';
+  const id = decodeURIComponent(vaultId);
+  const label = findVault(id) ? await loadVaultName(id) : 'Vault';
   return { title: { default: `${label} · Skynest`, template: `%s · ${label} · Skynest` } };
 }
 
@@ -72,7 +74,11 @@ export default async function VaultLayout({ children, params }: LayoutProps) {
   const { viewer } = session;
   const canSync =
     viewer.access === 'write' && (!viewer.reviewRequired || viewer.isReviewer) && getGitSource(vault.id) !== null;
-  const [drafts, linkIndex] = await Promise.all([loadDrafts(vault.id), loadLinkIndex(vault.id)]);
+  const [drafts, linkIndex, vaults] = await Promise.all([
+    loadDrafts(vault.id),
+    loadLinkIndex(vault.id),
+    Promise.all(listVaults().map(async (v) => ({ id: v.id, label: await loadVaultName(v.id) }))),
+  ]);
   const login = viewer.login.toLowerCase();
   const reviewCount = drafts.filter((d) => d.status === 'in_review').length;
   const myDraftCount = drafts.filter(
@@ -90,7 +96,7 @@ export default async function VaultLayout({ children, params }: LayoutProps) {
                 <img src="/logo.jpg" alt="" className="h-7 w-7 rounded-md" />
               </Link>
               <span aria-hidden className="text-gray-300">/</span>
-              <VaultSwitcher vaults={listVaults()} currentId={vault.id} />
+              <VaultSwitcher vaults={vaults} currentId={vault.id} />
             </div>
             <Suspense fallback={<div className="h-9 w-64" />}>
               <VaultNav
@@ -109,6 +115,16 @@ export default async function VaultLayout({ children, params }: LayoutProps) {
               <Link href={urls.newDoc()} aria-label="New document" title="New document" className={buttonClass('primary', 'md', 'shrink-0')}>
                 <Icon name="plus" />
                 <span className="hidden lg:inline" aria-hidden>New document</span>
+              </Link>
+            )}
+            {viewer.isReviewer && (
+              <Link
+                href={urls.settings}
+                aria-label="Vault settings"
+                title="Vault settings"
+                className={buttonClass('ghost', 'md', 'shrink-0').replace('px-3.5', 'px-2')}
+              >
+                <Icon name="settings" className="h-5 w-5" />
               </Link>
             )}
             <UserMenu viewer={{ login: viewer.login, name: viewer.name, image: viewer.image, access: viewer.access, isReviewer: viewer.isReviewer }} />

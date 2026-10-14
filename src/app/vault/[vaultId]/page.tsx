@@ -20,6 +20,7 @@ import {
 } from '@/lib/vault-ui/data';
 import { flattenFolders } from '@/lib/vault-ui/folder-path';
 import { vaultUrls } from '@/lib/vault-ui/paths';
+import { loadVaultConfig } from '@/lib/vault-ui/vault-config';
 
 interface Props {
   params: Promise<{ vaultId: string }>;
@@ -30,7 +31,12 @@ export default async function BrowsePage({ params, searchParams }: Props) {
   const { vaultId } = await params;
   const urls = vaultUrls(vaultId);
   const { folder = '', q = '', type } = await searchParams;
-  const [viewer, allNodes, drafts] = await Promise.all([requireViewer(), loadNodes(vaultId), loadDrafts(vaultId)]);
+  const [viewer, allNodes, drafts, config] = await Promise.all([
+    requireViewer(),
+    loadNodes(vaultId),
+    loadDrafts(vaultId),
+    loadVaultConfig(vaultId),
+  ]);
   const nodes = visibleNodes(allNodes, uiRootFor(vaultId));
   const root = effectiveRoot(nodes, uiRootFor(vaultId));
   const draftByDoc = new Map(drafts.map((d) => [d.docId, d]));
@@ -56,6 +62,7 @@ export default async function BrowsePage({ params, searchParams }: Props) {
   const hiddenCrumbs = root && folder.startsWith(root) ? root.split('/').length : 0;
   const canWrite = viewer.access === 'write';
   const existingFolders = flattenFolders(tree);
+  const folderDescription = !query && folder ? config?.folders?.[folder]?.description : undefined;
 
   return (
     <FolderActionsProvider rootPath={tree.path} existingFolders={existingFolders}>
@@ -100,6 +107,7 @@ export default async function BrowsePage({ params, searchParams }: Props) {
               {items.length} {items.length === 1 ? 'document' : 'documents'}
               {query && folder ? ` in ${folder}` : ''}
             </p>
+            {folderDescription && <p className="mt-2 max-w-2xl text-sm text-gray-600">{folderDescription}</p>}
           </div>
           {canWrite && (
             <div className="flex gap-2">

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Icon } from "../Icon";
 import type { IconName } from "../Icon";
 
@@ -34,7 +35,7 @@ function Item({
       onClick={onClick}
       className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
     >
-      <Icon name={icon} className="h-4 w-4 text-gray-400" />
+      <Icon name={icon} className="h-4 w-4 text-gray-500" />
       {label}
     </button>
   );
@@ -47,6 +48,27 @@ export function ContextMenu({
   onClose,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+
+  // Keep the menu on screen when right-clicking near the bottom or right edge.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const margin = 8;
+    const { width, height } = el.getBoundingClientRect();
+    const x = Math.max(margin, Math.min(position.x, window.innerWidth - width - margin));
+    const y = Math.max(margin, Math.min(position.y, window.innerHeight - height - margin));
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+  }, [position.x, position.y]);
+
+  const onKeyDown = (e: ReactKeyboardEvent) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const items = Array.from(ref.current?.querySelectorAll<HTMLButtonElement>("button") ?? []);
+    const index = items.indexOf(document.activeElement as HTMLButtonElement);
+    const next = e.key === "ArrowDown" ? index + 1 : index - 1;
+    items[(next + items.length) % items.length]?.focus();
+  };
 
   useEffect(() => {
     ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
@@ -72,6 +94,8 @@ export function ContextMenu({
     <div
       ref={ref}
       role="menu"
+      aria-label="Folder actions"
+      onKeyDown={onKeyDown}
       style={{ left: position.x, top: position.y }}
       className="fixed z-50 w-48 rounded-lg bg-white p-1 shadow-lg ring-1 ring-gray-200"
     >

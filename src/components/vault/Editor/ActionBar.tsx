@@ -4,6 +4,7 @@ import type { DraftStatus } from '@/lib/review/types';
 import { Icon } from '../Icon';
 import { buttonClass } from '../button-styles';
 import { PAGE_CONTAINER } from '../layout-styles';
+import { useShortcutLabel } from '../useShortcutLabel';
 
 interface Props {
   dirty: boolean;
@@ -33,6 +34,7 @@ function statusText(dirty: boolean, revision: number | null, status: DraftStatus
 
 /** Sticky footer with save state and the draft lifecycle actions. */
 export function ActionBar(props: Props) {
+  const keys = useShortcutLabel();
   const { dirty, pending, revision, status, isReviewer, canSave, canSubmit, error } = props;
   const nothingYet = canSubmit ? undefined : 'Make a change first';
   const inReview = status === 'in_review';
@@ -48,7 +50,7 @@ export function ActionBar(props: Props) {
           <p aria-live="polite" className={`flex items-center gap-2 text-sm ${dirty ? 'text-amber-700' : 'text-gray-500'}`}>
             <span className={`h-2 w-2 rounded-full ${dirty ? 'bg-amber-500' : revision ? 'bg-emerald-500' : 'bg-gray-300'}`} />
             {pending ? 'Working…' : statusText(dirty, revision, status)}
-            <kbd className="ml-1 hidden rounded border border-gray-200 px-1.5 font-mono text-[10px] text-gray-500 sm:inline">⌘S</kbd>
+            <kbd className="ml-1 hidden rounded border border-gray-200 px-1.5 font-mono text-[10px] text-gray-500 sm:inline">{keys('⌘S')}</kbd>
           </p>
         )}
         <div className="ml-auto flex flex-wrap items-center gap-2">

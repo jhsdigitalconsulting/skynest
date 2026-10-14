@@ -4,10 +4,16 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { vaultUrls } from '@/lib/vault-ui/paths';
-import { resolveVaultHref } from '@/lib/vault-ui/wikilinks';
+import { contextnestHref, resolveVaultHref } from '@/lib/vault-ui/wikilinks';
+import type { LinkTarget } from '@/lib/vault-ui/wikilinks';
+import { titleOf } from '../dialogs/DocLinkDialog/search';
 import { PROSE_CLASS, assetSrc } from '../../Markdown';
 import type { VaultLinks } from '../../Markdown';
 import { applyGentleEscaping, visualExtensions } from './extensions';
+import { docSlash } from './doc-slash';
+import type { DocSlashBridge, DocSlashState } from './doc-slash';
+import { DocSlashMenu } from './DocSlashMenu';
+import type { DocSlashMenuHandle } from './DocSlashMenu';
 import { loadMarkdown, toMarkdown } from './markdown-sync';
 import type { SourceMap } from './markdown-sync';
 import { VisualDialogs } from './VisualDialogs';
@@ -54,8 +60,20 @@ export function VisualPane({ value, onChange, disabled, controls, links }: Visua
 
   const media = useMediaUpload(links.vaultId);
 
+  // The `/` document search: the extension reports what's typed, the menu handles the keys.
+  const [slash, setSlash] = useState<DocSlashState | null>(null);
+  const slashMenu = useRef<DocSlashMenuHandle>(null);
+  const slashBridge = useRef<DocSlashBridge | null>(null);
+  slashBridge.current = {
+    onChange: setSlash,
+    onKeyDown: (event) => slashMenu.current?.onKeyDown(event) ?? false,
+  };
+
   const editor = useEditor({
-    extensions: visualExtensions('Start writing…', (src) => assetSrc(src, linksRef.current.vaultId)),
+    extensions: [
+      ...visualExtensions('Start writing… Type / to link a document.', (src) => assetSrc(src, linksRef.current.vaultId)),
+      docSlash(slashBridge),
+    ],
     immediatelyRender: false,
     editable: !disabled,
     editorProps: {
@@ -111,18 +129,36 @@ export function VisualPane({ value, onChange, disabled, controls, links }: Visua
     media.editorRef.current = editor;
   }, [editor, media.editorRef]);
 
+  const pickSlash = (doc: LinkTarget) => {
+    if (!editor || !slash) return;
+    const href = contextnestHref(doc.id);
+    editor
+      .chain()
+      .focus()
+      .deleteRange(slash.range)
+      .insertContent([
+        { type: 'text', text: titleOf(doc), marks: [{ type: 'link', attrs: { href } }] },
+        { type: 'text', text: ' ' },
+      ])
+      .run();
+  };
+
   return (
     <div className="overflow-clip rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
-      <div className="sticky top-14 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white/95 px-2 py-1.5 backdrop-blur">
-        <VisualToolbar editor={editor} disabled={disabled} onOpenDialog={setDialog} />
-        {controls}
+      {/* Upload progress rides with the sticky toolbar so it stays visible while scrolled down the page. */}
+      <div className="sticky top-14 z-10 border-b border-gray-200 bg-white/95 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-2 py-1.5">
+          <VisualToolbar editor={editor} disabled={disabled} onOpenDialog={setDialog} />
+          {controls}
+        </div>
+        <UploadStatus status={media.status} onDismiss={media.clearStatus} onCancel={media.cancel} />
       </div>
-      <UploadStatus status={media.status} onDismiss={media.clearStatus} />
       {editor ? (
         <EditorContent editor={editor} />
       ) : (
         <div className="min-h-[480px] px-6 py-5 text-sm text-gray-400 sm:px-8">Loading editor…</div>
       )}
+      {editor && slash && <DocSlashMenu ref={slashMenu} state={slash} docs={links.index.docs} onPick={pickSlash} />}
       {editor && dialog && (
         <VisualDialogs editor={editor} dialog={dialog} docs={links.index.docs} vaultId={links.vaultId} onClose={() => setDialog(null)} />
       )}

@@ -91,7 +91,8 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
     />
   );
 
-  const active = tab === 'preview' ? 'preview' : tab === 'current' && node ? 'current' : 'changes';
+  // Preview first: most reviews start by reading the draft as it will appear, then checking the diff.
+  const active = tab === 'changes' ? 'changes' : tab === 'current' && node ? 'current' : 'preview';
   const others = draft.contributors.filter((c) => c !== draft.author);
 
   return (
@@ -163,8 +164,8 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
         <Tabs
           active={active}
           tabs={[
-            { key: 'changes', label: 'Changes', icon: 'diff', href: urls.reviewDraft(docId) },
-            { key: 'preview', label: 'Preview', icon: 'eye', href: urls.reviewDraft(docId, 'preview') },
+            { key: 'preview', label: 'Preview', icon: 'eye', href: urls.reviewDraft(docId) },
+            { key: 'changes', label: 'Changes', icon: 'diff', href: urls.reviewDraft(docId, 'changes') },
             ...(node
               ? [{ key: 'current', label: `Published${liveVersion ? ` v${liveVersion}` : ''}`, icon: 'file' as const, href: urls.reviewDraft(docId, 'current') }]
               : []),

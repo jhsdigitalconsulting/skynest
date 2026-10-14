@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { isDraftStale } from '@/lib/review/stale-reason';
+import type { PublishedState } from '@/lib/review/stale-reason';
 import type { DraftSummary } from '@/lib/review/types';
 import { vaultUrls } from '@/lib/vault-ui/paths';
 import { Icon } from './Icon';
@@ -9,14 +11,14 @@ import { DraftStatusBadge, NewBadge } from './StatusBadge';
 interface Props {
   vaultId: string;
   draft: DraftSummary;
-  /** Published version the draft would replace, when the document exists. */
-  liveVersion: number | null;
+  /** The published document the draft would replace, or null when there isn't one. */
+  published: PublishedState | null;
 }
 
 /** One row in the review queue: what changed, who changed it, and where it stands. */
-export function DraftCard({ vaultId, draft, liveVersion }: Props) {
+export function DraftCard({ vaultId, draft, published }: Props) {
   const urls = vaultUrls(vaultId);
-  const stale = !draft.isNew && liveVersion !== null && liveVersion !== draft.baseVersion;
+  const stale = isDraftStale(draft, published);
   const others = draft.contributors.filter((c) => c !== draft.author);
   return (
     <li>

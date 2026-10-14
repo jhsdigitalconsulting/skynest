@@ -1,12 +1,19 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { VersionManager } from '@promptowl/contextnest-engine';
+import {
+  VersionManager,
+  approveSuggestion,
+  rejectSuggestion,
+  serializeDocument,
+} from '@promptowl/contextnest-engine';
+import type { RbacHook } from '@promptowl/contextnest-engine';
 import {
   ReviewError,
   approveDraft,
   commentOnDraft,
   discardDraft,
+  listDrafts,
   normalizeDocId,
   requestChanges,
   saveDraft,
@@ -22,6 +29,8 @@ import {
 } from '@/lib/vault-ui/context';
 import { vaultUrls } from '@/lib/vault-ui/paths';
 import type { ActionResult, EditorFields } from '@/lib/vault-ui/types';
+import { applySettings } from '@/lib/vault-ui/vault-settings';
+import type { VaultSettingsInput } from '@/lib/vault-ui/vault-settings';
 
 async function run(fn: () => Promise<ActionResult>): Promise<ActionResult> {
   try {
@@ -188,10 +197,15 @@ export async function approveAction(
       docId,
       options,
     );
+    // With more drafts waiting, a reviewer working the queue wants the next one, not the doc they just approved.
+    const waiting = (await listDrafts(storage, { status: 'in_review' })).length;
+    const urls = vaultUrls(vaultId);
     return {
       ok: true,
-      message: `Approved and published v${result.version}`,
-      redirectTo: vaultUrls(vaultId).doc(normalizeDocId(docId)),
+      message: waiting
+        ? `Approved and published v${result.version} · ${waiting} more waiting for review`
+        : `Approved and published v${result.version}`,
+      redirectTo: waiting ? urls.review() : urls.doc(normalizeDocId(docId)),
     };
   });
 }
@@ -222,5 +236,107 @@ export async function saveContextMdAction(vaultId: string, content: string): Pro
     const { storage } = engineFor(viewer, vaultId);
     await storage.writeContextMd(content);
     return { ok: true, message: 'Vault instructions saved' };
+  });
+}
+
+// Zone RBAC isn't enforced per call in the hosted vault (see the MCP tools); the reviewer check below is the gate.
+const permissiveRbac: RbacHook = {
+  isCzar: () => true,
+  canIngest: () => true,
+  isDocOwner: () => true,
+};
+
+/** Apply a drift suggestion: patches the document and publishes it as a new version. Reviewer-only. */
+export async function approveSuggestionAction(
+  vaultId: string,
+  docId: string,
+  suggestionId: string,
+  comment?: string,
+): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireWriter();
+    if (!viewer.isReviewer) {
+      return { ok: false, error: 'Only reviewers can apply suggestions.', code: 'forbidden' };
+    }
+    const { storage, sync, userToken } = engineFor(viewer, vaultId);
+    const id = normalizeDocId(docId);
+    const node = await storage.readDocument(id);
+    const result = await approveSuggestion({
+      storage,
+      rbac: permissiveRbac,
+      documentId: id,
+      actor: viewer.login,
+      zone: node.frontmatter.zone ?? 'default',
+      suggestionId,
+      comment: comment || undefined,
+    });
+    await storage.regenerateIndex();
+    const updated = await storage.readDocument(id);
+    await sync.commitFile({
+      path: `${id}.md`,
+      content: Buffer.from(serializeDocument(updated), 'utf-8'),
+      message: `approve suggestion ${suggestionId} on ${id}`,
+      editedBy: viewer.login,
+      userToken,
+    });
+    return { ok: true, message: `Suggestion applied — published v${result.versionEntry.version}` };
+  });
+}
+
+/** Dismiss a drift suggestion. The document is untouched; the suggestion is archived with the reason. */
+export async function rejectSuggestionAction(
+  vaultId: string,
+  docId: string,
+  suggestionId: string,
+  reason: string,
+): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireWriter();
+    if (!viewer.isReviewer) {
+      return { ok: false, error: 'Only reviewers can dismiss suggestions.', code: 'forbidden' };
+    }
+    if (!reason.trim()) return { ok: false, error: 'Add a reason for dismissing the suggestion.' };
+    const { storage } = engineFor(viewer, vaultId);
+    const id = normalizeDocId(docId);
+    const node = await storage.readDocument(id);
+    await rejectSuggestion({
+      storage,
+      rbac: permissiveRbac,
+      documentId: id,
+      actor: viewer.login,
+      zone: node.frontmatter.zone ?? 'default',
+      suggestionId,
+      reason: reason.trim(),
+    });
+    return { ok: true, message: 'Suggestion dismissed' };
+  });
+}
+
+/**
+ * Save the Settings page to .context/config.yaml and commit it. Settings the page
+ * doesn't edit (version, servers, sync…) are kept as they are. Reviewer-only.
+ */
+export async function saveVaultSettingsAction(vaultId: string, input: VaultSettingsInput): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireWriter();
+    if (!viewer.isReviewer) {
+      return { ok: false, error: 'Only reviewers can change the vault settings.', code: 'forbidden' };
+    }
+    const { storage, sync, userToken } = engineFor(viewer, vaultId);
+    const [config, nodes] = await Promise.all([storage.readConfig(), storage.discoverDocuments()]);
+    const result = applySettings(config, input, new Set(nodes.map((n) => n.id)));
+    if (!result.ok) return { ok: false, error: result.error };
+    await storage.writeConfig(result.config);
+    const written = await storage.provider.read('.context/config.yaml');
+    if (written) {
+      await sync.commitFile({
+        path: '.context/config.yaml',
+        content: written,
+        message: 'update vault settings',
+        editedBy: viewer.login,
+        userToken,
+      });
+    }
+    return { ok: true, message: 'Vault settings saved' };
   });
 }

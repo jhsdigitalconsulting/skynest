@@ -11,6 +11,7 @@ import { applyEdit } from './applyEdit';
 import { SHORTCUTS, Toolbar } from '../Toolbar';
 import { ModeSwitch } from '../ModeSwitch';
 import type { EditorMode } from '../ModeSwitch';
+import { useShortcutLabel } from '../../useShortcutLabel';
 
 export interface MarkdownPaneProps {
   value: string;
@@ -23,6 +24,7 @@ export interface MarkdownPaneProps {
 }
 
 export function MarkdownPane({ value, onChange, mode, onModeChange, disabled, links }: MarkdownPaneProps) {
+  const keys = useShortcutLabel();
   const ref = useRef<HTMLTextAreaElement>(null);
   const [picking, setPicking] = useState(false);
 
@@ -90,7 +92,7 @@ export function MarkdownPane({ value, onChange, mode, onModeChange, disabled, li
             disabled={disabled}
             spellCheck
             aria-label="Document body (markdown)"
-            placeholder="Write in markdown…  Use the toolbar or ⌘B / ⌘I / ⌘K for formatting."
+            placeholder={keys('Write in markdown…  Use the toolbar or ⌘B / ⌘I / ⌘K for formatting.')}
             className="editor-textarea block w-full resize-none border-0 bg-transparent px-6 py-5 font-mono text-[14px] leading-7 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-0"
           />
         </div>

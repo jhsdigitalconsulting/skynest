@@ -3,6 +3,7 @@
 import { Icon } from '../../Icon';
 import type { Command } from '../commands';
 import { TOOLBAR_ACTIONS } from './actions';
+import { useShortcutLabel } from '../../useShortcutLabel';
 
 export { SHORTCUTS, TOOLBAR_ACTIONS } from './actions';
 export type { ToolbarAction } from './actions';
@@ -18,6 +19,7 @@ const BUTTON_CLASS =
   'flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-40';
 
 export function Toolbar({ onCommand, onDocLink, disabled }: ToolbarProps) {
+  const keys = useShortcutLabel();
   return (
     <div className="flex flex-wrap items-center gap-0.5" role="toolbar" aria-label="Formatting">
       {TOOLBAR_ACTIONS.map((group, gi) => (
@@ -31,7 +33,7 @@ export function Toolbar({ onCommand, onDocLink, disabled }: ToolbarProps) {
               // Keep focus (and the selection) in the textarea.
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => onCommand(action.command)}
-              title={action.shortcut ? `${action.label} (${action.shortcut})` : action.label}
+              title={action.shortcut ? `${action.label} (${keys(action.shortcut)})` : action.label}
               aria-label={action.label}
               className={BUTTON_CLASS}
             >
@@ -44,7 +46,7 @@ export function Toolbar({ onCommand, onDocLink, disabled }: ToolbarProps) {
               disabled={disabled}
               onMouseDown={(e) => e.preventDefault()}
               onClick={onDocLink}
-              title="Link to a document (⌘⇧K)"
+              title={`Link to a document (${keys('⌘⇧K')})`}
               aria-label="Link to a document"
               className={BUTTON_CLASS}
             >

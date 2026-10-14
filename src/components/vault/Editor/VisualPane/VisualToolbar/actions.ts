@@ -7,7 +7,7 @@ export type VisualDialog = 'url' | 'doc' | 'image' | 'table';
 export interface VisualAction {
   key: string;
   label: string;
-  /** An icon, or `text` for buttons labelled with a few letters (H1–H6). */
+  /** An icon, or `text` for buttons labelled with a few letters. */
   icon?: IconName;
   text?: string;
   shortcut?: string;
@@ -18,7 +18,19 @@ export interface VisualAction {
   run: (editor: Editor, open: (dialog: VisualDialog) => void) => void;
 }
 
-const HEADINGS = [1, 2, 3, 4, 5, 6] as const;
+export const HEADINGS = [1, 2, 3, 4, 5, 6] as const;
+
+/** The heading level at the cursor, or 0 for body text. */
+export function headingLevel(editor: Editor): number {
+  return HEADINGS.find((level) => editor.isActive('heading', { level })) ?? 0;
+}
+
+export function setHeading(editor: Editor, level: number) {
+  const chain = editor.chain().focus();
+  const heading = HEADINGS.find((h) => h === level);
+  if (heading) chain.setHeading({ level: heading }).run();
+  else chain.setParagraph().run();
+}
 
 export const ACTIONS: VisualAction[][] = [
   [
@@ -33,13 +45,6 @@ export const ACTIONS: VisualAction[][] = [
       run: (e) => e.chain().focus().toggleStrike().run(),
     },
   ],
-  HEADINGS.map((level) => ({
-    key: `h${level}`,
-    label: `Heading ${level}`,
-    text: `H${level}`,
-    active: ['heading', { level }] as [string, Record<string, unknown>],
-    run: (e: Editor) => e.chain().focus().toggleHeading({ level }).run(),
-  })),
   [
     { key: 'ul', label: 'Bulleted list', icon: 'list', active: 'bulletList', run: (e) => e.chain().focus().toggleBulletList().run() },
     {
@@ -70,6 +75,27 @@ export const ACTIONS: VisualAction[][] = [
     { key: 'undo', label: 'Undo', icon: 'undo', shortcut: '⌘Z', enabled: (e) => e.can().undo(), run: (e) => e.chain().focus().undo().run() },
     { key: 'redo', label: 'Redo', icon: 'redo', shortcut: '⌘⇧Z', enabled: (e) => e.can().redo(), run: (e) => e.chain().focus().redo().run() },
   ],
+];
+
+/** Shown only while the cursor is in a table. */
+export const TABLE_ACTIONS: VisualAction[] = [
+  { key: 'rowAdd', label: 'Add row below', text: '+ Row', enabled: (e) => e.can().addRowAfter(), run: (e) => e.chain().focus().addRowAfter().run() },
+  {
+    key: 'colAdd',
+    label: 'Add column to the right',
+    text: '+ Col',
+    enabled: (e) => e.can().addColumnAfter(),
+    run: (e) => e.chain().focus().addColumnAfter().run(),
+  },
+  { key: 'rowDel', label: 'Delete row', text: '− Row', enabled: (e) => e.can().deleteRow(), run: (e) => e.chain().focus().deleteRow().run() },
+  {
+    key: 'colDel',
+    label: 'Delete column',
+    text: '− Col',
+    enabled: (e) => e.can().deleteColumn(),
+    run: (e) => e.chain().focus().deleteColumn().run(),
+  },
+  { key: 'tableDel', label: 'Delete table', icon: 'trash', enabled: (e) => e.can().deleteTable(), run: (e) => e.chain().focus().deleteTable().run() },
 ];
 
 export function isActive(editor: Editor, active: VisualAction['active']): boolean {

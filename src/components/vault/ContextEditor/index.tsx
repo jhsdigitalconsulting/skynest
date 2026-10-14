@@ -10,6 +10,8 @@ import { MarkdownPane } from '../Editor/MarkdownPane';
 import { ModeSwitch } from '../Editor/ModeSwitch';
 import type { EditorMode } from '../Editor/ModeSwitch';
 import { VisualPane } from '../Editor/VisualPane';
+import { RestoreBanner } from '../Editor/RestoreBanner';
+import { useLocalBackup } from '../Editor/useLocalBackup';
 import { buttonClass } from '../button-styles';
 import { useVaultAction } from '../useVaultAction';
 import { useVaultId } from '../useVault';
@@ -34,6 +36,16 @@ export function ContextEditor({ initial, linkIndex }: ContextEditorProps) {
   const [mode, setMode] = useState<EditorMode>('visual');
   const links = useMemo(() => ({ vaultId, index: linkIndex }), [vaultId, linkIndex]);
   const dirty = body !== saved;
+  const backup = useLocalBackup<string>(
+    `skynest.backup.${vaultId}.__context__`,
+    body,
+    dirty,
+    (v): v is string => typeof v === 'string' && v !== splitContextMd(initial).body,
+  );
+  const restore = () => {
+    if (backup.offer) setBody(backup.offer.value);
+    backup.dismissOffer();
+  };
 
   const save = () => {
     const next = body;
@@ -49,6 +61,7 @@ export function ContextEditor({ initial, linkIndex }: ContextEditorProps) {
 
   return (
     <div>
+      {backup.offer && <RestoreBanner savedAt={backup.offer.savedAt} onRestore={restore} onDismiss={backup.dismissOffer} />}
       <div>
         {mode === 'visual' ? (
           <VisualPane value={body} onChange={setBody} controls={<ModeSwitch mode={mode} onChange={setMode} />} links={links} />

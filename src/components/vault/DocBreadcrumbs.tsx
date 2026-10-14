@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { vaultUrls } from '@/lib/vault-ui/paths';
+import { loadVaultName } from '@/lib/vault-ui/vault-config';
 import { Icon } from './Icon';
 
 interface Props {
@@ -9,13 +10,13 @@ interface Props {
   trail?: { label: string; href?: string }[];
 }
 
-/** Vault › folder › subfolder › doc — each folder links back to the browse view. */
-export function DocBreadcrumbs({ vaultId, docId, trail = [] }: Props) {
+/** Vault name › folder › subfolder › doc — each folder links back to the browse view. */
+export async function DocBreadcrumbs({ vaultId, docId, trail = [] }: Props) {
   const urls = vaultUrls(vaultId);
   const parts = docId.split('/');
   const name = parts.pop() ?? docId;
   const crumbs = [
-    { label: 'Vault', href: urls.browse() },
+    { label: await loadVaultName(vaultId), href: urls.browse() },
     ...parts.map((part, i) => ({ label: part, href: urls.browse({ folder: parts.slice(0, i + 1).join('/') }) })),
     { label: name, href: trail.length ? urls.doc(docId) : undefined },
     ...trail,
@@ -26,7 +27,7 @@ export function DocBreadcrumbs({ vaultId, docId, trail = [] }: Props) {
         <span key={`${c.label}-${i}`} className="flex items-center gap-1">
           {i > 0 && <Icon name="chevronRight" className="h-3.5 w-3.5 text-gray-300" />}
           {c.href ? (
-            <Link href={c.href} className="hover:text-gray-900">
+            <Link href={c.href} className="rounded hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
               {c.label}
             </Link>
           ) : (

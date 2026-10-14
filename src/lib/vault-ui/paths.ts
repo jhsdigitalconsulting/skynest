@@ -23,9 +23,10 @@ export function vaultUrls(vaultId: string) {
       const qs = params.toString();
       return qs ? `${root}?${qs}` : root;
     },
-    doc: (id: string, opts: { tab?: 'history'; version?: number } = {}) => {
+    doc: (id: string, opts: { tab?: 'history'; version?: number; view?: 'markdown' } = {}) => {
       const params = new URLSearchParams();
       if (opts.tab) params.set('tab', opts.tab);
+      if (opts.view) params.set('view', opts.view);
       if (opts.version !== undefined) params.set('v', String(opts.version));
       const qs = params.toString();
       return `${root}/doc/${encodeId(id)}${qs ? `?${qs}` : ''}`;

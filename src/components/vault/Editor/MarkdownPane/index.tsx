@@ -26,7 +26,12 @@ export interface MarkdownPaneProps {
 export function MarkdownPane({ value, onChange, mode, onModeChange, disabled, links }: MarkdownPaneProps) {
   const keys = useShortcutLabel();
   const ref = useRef<HTMLTextAreaElement>(null);
-  const [picking, setPicking] = useState(false);
+  // The selected text when the document picker opened; null while it's closed.
+  const [picking, setPicking] = useState<string | null>(null);
+  const openPicker = () => {
+    const el = ref.current;
+    setPicking(el ? el.value.slice(el.selectionStart, el.selectionEnd) : '');
+  };
 
   // Grow with the content so the page, not the textarea, scrolls.
   useLayoutEffect(() => {
@@ -53,7 +58,7 @@ export function MarkdownPane({ value, onChange, mode, onModeChange, disabled, li
     const el = e.currentTarget;
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
       e.preventDefault();
-      setPicking(true);
+      openPicker();
       return;
     }
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
@@ -79,7 +84,7 @@ export function MarkdownPane({ value, onChange, mode, onModeChange, disabled, li
   return (
     <div className="overflow-clip rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
       <div className="sticky top-14 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white/95 px-2 py-1.5 backdrop-blur">
-        <Toolbar onCommand={run} onDocLink={() => setPicking(true)} disabled={disabled || mode === 'preview'} />
+        <Toolbar onCommand={run} onDocLink={openPicker} disabled={disabled || mode === 'preview'} />
         <ModeSwitch mode={mode} onChange={onModeChange} />
       </div>
       <div className={mode === 'split' ? 'grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:divide-x lg:divide-gray-200' : ''}>
@@ -102,16 +107,18 @@ export function MarkdownPane({ value, onChange, mode, onModeChange, disabled, li
           </div>
         )}
       </div>
-      {picking && (
+      {picking !== null && (
         <DocLinkDialog
           docs={links.index.docs}
+          initialText={picking}
+          editing={false}
           onClose={() => {
-            setPicking(false);
+            setPicking(null);
             ref.current?.focus();
           }}
-          onPick={(doc) => {
-            setPicking(false);
-            run(linkTo(contextnestHref(doc.id), titleOf(doc)));
+          onPick={(doc, text) => {
+            setPicking(null);
+            run(linkTo(contextnestHref(doc.id), titleOf(doc), text));
           }}
         />
       )}

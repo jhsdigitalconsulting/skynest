@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { Editor } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
 import { applyGentleEscaping, visualExtensions } from './extensions';
-import { applyLink, currentHref, removeLink } from './linking';
+import { applyLink, currentHref, currentLinkText, removeLink } from './linking';
 import { loadMarkdown, toMarkdown } from './markdown-sync';
 
 let editor: Editor | null = null;
@@ -40,8 +40,24 @@ describe('visual editor links and images', () => {
   it('links the selection to a document', () => {
     const { editor: e, out } = open('See the location doc.');
     select(e, 'location');
-    applyLink(e, 'contextnest://nodes/core/location', 'Location');
+    applyLink(e, 'contextnest://nodes/core/location');
     expect(out()).toBe('See the [location](contextnest://nodes/core/location) doc.');
+  });
+
+  it('rewrites the selected text when the link should read differently', () => {
+    const { editor: e, out } = open('Many practice here.');
+    select(e, 'practice');
+    expect(currentLinkText(e)).toBe('practice');
+    applyLink(e, 'contextnest://nodes/core/practice', 'practices');
+    expect(out()).toBe('Many [practices](contextnest://nodes/core/practice) here.');
+  });
+
+  it('changes the text of an existing link without moving it', () => {
+    const { editor: e, out } = open('See [Practice](contextnest://nodes/core/practice) and more.');
+    select(e, 'Practice', true);
+    expect(currentLinkText(e)).toBe('Practice');
+    applyLink(e, 'contextnest://nodes/core/practice', 'Practices');
+    expect(out()).toBe('See [Practices](contextnest://nodes/core/practice) and more.');
   });
 
   it('inserts the title as a link when nothing is selected', () => {
@@ -55,7 +71,7 @@ describe('visual editor links and images', () => {
     const { editor: e, out } = open('Go to [the site](https://old.example.com) now.');
     select(e, 'site', true);
     expect(currentHref(e)).toBe('https://old.example.com');
-    applyLink(e, 'https://new.example.com', 'ignored');
+    applyLink(e, 'https://new.example.com');
     expect(out()).toBe('Go to [the site](https://new.example.com) now.');
     select(e, 'site', true);
     removeLink(e);

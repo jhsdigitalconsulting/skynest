@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { FOCUS_RING } from './button-styles';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 import { useVaultUrls } from './useVault';
@@ -63,18 +64,19 @@ export function VaultNav({ reviewCount, myDraftCount, canEditContext }: Props) {
   ];
 
   return (
-    <nav className="flex items-center gap-1">
+    <nav className="flex shrink-0 items-center gap-1" aria-label="Vault">
       {items.map((item) => (
         <Link
           key={item.label}
           href={item.href}
           aria-current={item.active ? 'page' : undefined}
-          className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors ${
+          title={item.label}
+          className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors ${FOCUS_RING} ${
             item.active ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
           }`}
         >
           <Icon name={item.icon} className="h-4 w-4" />
-          <span className="hidden md:inline">{item.label}</span>
+          <span className="sr-only md:not-sr-only">{item.label}</span>
           {item.count ? (
             <span
               className={`min-w-5 rounded-full px-1.5 py-px text-center text-[11px] font-semibold ${

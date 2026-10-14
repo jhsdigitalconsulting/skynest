@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { DocListItem } from '@/lib/vault-ui/types';
 import { vaultUrls } from '@/lib/vault-ui/paths';
+import { FOCUS_RING } from './button-styles';
 import { Icon } from './Icon';
 import { RelativeTime } from './RelativeTime';
 import { DocStatusBadge, DraftStatusBadge, TypeBadge } from './StatusBadge';
@@ -22,7 +23,7 @@ export function DocList({ vaultId, items, folder }: Props) {
           <li key={item.id}>
             <Link
               href={urls.doc(item.id)}
-              className="group flex gap-3 px-4 py-3.5 transition-colors hover:bg-gray-50 sm:px-5"
+              className={`group flex gap-3 px-4 py-3.5 transition-colors hover:bg-gray-50 focus-visible:ring-inset sm:px-5 ${FOCUS_RING}`}
             >
               <Icon name="file" className="mt-0.5 h-5 w-5 shrink-0 text-gray-400 group-hover:text-indigo-500" />
               <div className="min-w-0 flex-1">
@@ -31,7 +32,11 @@ export function DocList({ vaultId, items, folder }: Props) {
                   {item.type !== 'document' && <TypeBadge type={item.type} />}
                   {item.draftStatus && <DraftStatusBadge status={item.draftStatus} />}
                 </div>
-                <p className="mt-0.5 truncate font-mono text-xs text-gray-400">{relative}</p>
+                <p className="mt-0.5 truncate font-mono text-xs text-gray-500">{relative}</p>
+                <div className="mt-1 flex items-center gap-2 text-xs text-gray-500 sm:hidden">
+                  <DocStatusBadge status={item.status} version={item.version} />
+                  <RelativeTime iso={item.updatedAt} />
+                </div>
                 {(item.excerpt || item.description) && (
                   <p className="mt-1.5 line-clamp-2 text-sm text-gray-600">{item.excerpt ?? item.description}</p>
                 )}
@@ -42,6 +47,7 @@ export function DocList({ vaultId, items, folder }: Props) {
                         {tag}
                       </span>
                     ))}
+                    {item.tags.length > 6 && <span className="px-1 py-0.5 text-[11px] text-gray-500">+{item.tags.length - 6} more</span>}
                   </div>
                 )}
               </div>

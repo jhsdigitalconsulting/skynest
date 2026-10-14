@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import type { Components } from 'react-markdown';
+import rehypeSlug from 'rehype-slug';
 import remarkGfm from 'remark-gfm';
 import { assetFileFromUrl } from '@/lib/vault-ui/assets';
 import { vaultUrls } from '@/lib/vault-ui/paths';
@@ -24,9 +25,11 @@ interface Props {
 
 /** Typography for rendered documents, shared with the visual editor so both look the same. */
 export const PROSE_CLASS =
-  'prose prose-gray max-w-none prose-headings:scroll-mt-20 prose-headings:font-semibold prose-a:text-indigo-600 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-pre:bg-gray-900 prose-table:text-sm';
+  'prose prose-gray max-w-none [overflow-wrap:anywhere] prose-headings:scroll-mt-20 prose-headings:font-semibold prose-a:text-indigo-600 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-pre:bg-gray-900 prose-pre:text-gray-100 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-inherit prose-table:text-sm';
 
 const PLUGINS = [remarkGfm, remarkWikiLinks, remarkAssetVideos];
+// Headings get ids, so `#section` links and shared URLs land on them.
+const REHYPE_PLUGINS = [rehypeSlug];
 
 // In-vault links are resolved by the `a` renderer, so let their schemes through.
 function urlTransform(url: string): string {
@@ -41,6 +44,13 @@ export function assetSrc(src: string, vaultId: string | undefined): string {
 
 function components(links: VaultLinks | undefined): Components {
   return {
+    table({ node: _node, ...rest }) {
+      return (
+        <div className="overflow-x-auto">
+          <table {...rest} />
+        </div>
+      );
+    },
     img({ src, alt, node: _node, ...rest }) {
       const resolved = typeof src === 'string' ? assetSrc(src, links?.vaultId) : src;
       // eslint-disable-next-line @next/next/no-img-element -- arbitrary document images, not optimizable assets
@@ -74,7 +84,7 @@ function components(links: VaultLinks | undefined): Components {
 export function Markdown({ source, className = '', links }: Props) {
   return (
     <div className={`${PROSE_CLASS} ${className}`}>
-      <ReactMarkdown remarkPlugins={PLUGINS} urlTransform={urlTransform} components={components(links)}>
+      <ReactMarkdown remarkPlugins={PLUGINS} rehypePlugins={REHYPE_PLUGINS} urlTransform={urlTransform} components={components(links)}>
         {source}
       </ReactMarkdown>
     </div>

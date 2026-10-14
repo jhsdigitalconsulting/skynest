@@ -10,6 +10,8 @@ import { MarkdownPane } from '../Editor/MarkdownPane';
 import { ModeSwitch } from '../Editor/ModeSwitch';
 import type { EditorMode } from '../Editor/ModeSwitch';
 import { VisualPane } from '../Editor/VisualPane';
+import { RestoreBanner } from '../Editor/RestoreBanner';
+import { useLocalBackup } from '../Editor/useLocalBackup';
 import { buttonClass } from '../button-styles';
 import { useVaultAction } from '../useVaultAction';
 import { useVaultId } from '../useVault';
@@ -34,6 +36,16 @@ export function ContextEditor({ initial, linkIndex }: ContextEditorProps) {
   const [mode, setMode] = useState<EditorMode>('visual');
   const links = useMemo(() => ({ vaultId, index: linkIndex }), [vaultId, linkIndex]);
   const dirty = body !== saved;
+  const backup = useLocalBackup<string>(
+    `skynest.backup.${vaultId}.__context__`,
+    body,
+    dirty,
+    (v): v is string => typeof v === 'string' && v !== splitContextMd(initial).body,
+  );
+  const restore = () => {
+    if (backup.offer) setBody(backup.offer.value);
+    backup.dismissOffer();
+  };
 
   const save = () => {
     const next = body;
@@ -49,18 +61,22 @@ export function ContextEditor({ initial, linkIndex }: ContextEditorProps) {
 
   return (
     <div>
+      {backup.offer && <RestoreBanner savedAt={backup.offer.savedAt} onRestore={restore} onDismiss={backup.dismissOffer} />}
       <div>
         {mode === 'visual' ? (
-          <VisualPane value={body} onChange={setBody} disabled={pending} controls={<ModeSwitch mode={mode} onChange={setMode} />} links={links} />
+          <VisualPane value={body} onChange={setBody} controls={<ModeSwitch mode={mode} onChange={setMode} />} links={links} />
         ) : (
-          <MarkdownPane value={body} onChange={setBody} mode={mode} onModeChange={setMode} disabled={pending} links={links} />
+          <MarkdownPane value={body} onChange={setBody} mode={mode} onModeChange={setMode} links={links} />
         )}
       </div>
-      <div className="mt-3 flex items-center justify-end gap-3">
-        <span className="text-xs text-gray-500">{dirty ? 'Unsaved changes' : 'All changes saved'}</span>
+      {/* Sticky so the save button stays in reach on a long file. Saving goes live for every agent straight away. */}
+      <div className="sticky bottom-0 z-20 mt-3 flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 bg-gray-50/95 py-3 backdrop-blur">
+        <span aria-live="polite" className={`text-sm ${dirty ? 'text-amber-700' : 'text-gray-500'}`}>
+          {dirty ? 'Unsaved changes — saving publishes them to every agent' : 'All changes saved'}
+        </span>
         <button type="button" onClick={save} disabled={!dirty || pending} className={buttonClass('primary')}>
           <Icon name="check" />
-          {pending ? 'Saving…' : 'Save'}
+          {pending ? 'Publishing…' : 'Save & publish'}
         </button>
       </div>
     </div>

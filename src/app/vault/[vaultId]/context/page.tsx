@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { ContextEditor } from '@/components/vault/ContextEditor';
 import { PAGE_CONTAINER } from '@/components/vault/layout-styles';
 import { engineFor, requireViewer } from '@/lib/vault-ui/context';
+import { loadLinkIndex } from '@/lib/vault-ui/data';
 import { vaultUrls } from '@/lib/vault-ui/paths';
 
 interface Props {
@@ -15,7 +16,7 @@ export default async function ContextPage({ params }: Props) {
   const viewer = await requireViewer();
   if (!viewer.isReviewer) redirect(vaultUrls(vaultId).browse());
   const { storage } = engineFor(viewer, vaultId);
-  const contextMd = await storage.readContextMd();
+  const [contextMd, linkIndex] = await Promise.all([storage.readContextMd(), loadLinkIndex(vaultId)]);
 
   return (
     <div className={`${PAGE_CONTAINER} max-w-4xl py-6`}>
@@ -23,10 +24,10 @@ export default async function ContextPage({ params }: Props) {
       <p className="mt-1.5 text-gray-600">
         This is the vault&rsquo;s <code className="rounded bg-gray-100 px-1 text-sm">CONTEXT.md</code>: its identity and
         operating instructions. AI clients read it first, before any document. Saving publishes it immediately — it
-        doesn&rsquo;t go through review.
+        doesn&rsquo;t go through review. Any frontmatter at the top of the file is kept as is.
       </p>
       <div className="mt-5">
-        <ContextEditor initial={contextMd ?? ''} />
+        <ContextEditor initial={contextMd ?? ''} linkIndex={linkIndex} />
       </div>
     </div>
   );

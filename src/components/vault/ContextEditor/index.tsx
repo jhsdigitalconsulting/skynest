@@ -1,8 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { saveContextMdAction } from '@/app/vault/actions';
+import { joinContextMd, splitContextMd } from '@/lib/vault-ui/context-md';
+import type { LinkIndex } from '@/lib/vault-ui/wikilinks';
 import { Icon } from '../Icon';
+import { useEditorGuards } from '../Editor/useEditorGuards';
+import { MarkdownPane } from '../Editor/MarkdownPane';
+import { ModeSwitch } from '../Editor/ModeSwitch';
+import type { EditorMode } from '../Editor/ModeSwitch';
+import { VisualPane } from '../Editor/VisualPane';
 import { buttonClass } from '../button-styles';
 import { useVaultAction } from '../useVaultAction';
 import { useVaultId } from '../useVault';
@@ -10,35 +17,45 @@ import { useVaultId } from '../useVault';
 export interface ContextEditorProps {
   /** The current CONTEXT.md, or an empty string when the vault has none yet. */
   initial: string;
+  /** The vault's documents, for document links. */
+  linkIndex: LinkIndex;
 }
 
-/** Plain-text editor for the vault's CONTEXT.md (its operating instructions for people and AI clients). */
-export function ContextEditor({ initial }: ContextEditorProps) {
+/**
+ * The same visual / markdown editor used for documents, applied to CONTEXT.md.
+ * Any YAML frontmatter is kept exactly as it was and written back on save.
+ */
+export function ContextEditor({ initial, linkIndex }: ContextEditorProps) {
   const vaultId = useVaultId();
   const { run, pending } = useVaultAction();
-  const [text, setText] = useState(initial);
-  const [saved, setSaved] = useState(initial);
-  const dirty = text !== saved;
+  const head = useRef(splitContextMd(initial).head);
+  const [body, setBody] = useState(() => splitContextMd(initial).body);
+  const [saved, setSaved] = useState(body);
+  const [mode, setMode] = useState<EditorMode>('visual');
+  const links = useMemo(() => ({ vaultId, index: linkIndex }), [vaultId, linkIndex]);
+  const dirty = body !== saved;
 
-  const save = () => run(() => saveContextMdAction(vaultId, text), (r) => r.ok && setSaved(text));
+  const save = () => {
+    const next = body;
+    run(
+      () => saveContextMdAction(vaultId, joinContextMd({ head: head.current, body: next })),
+      (r) => r.ok && setSaved(next),
+    );
+  };
+
+  useEditorGuards(dirty && !pending, () => {
+    if (dirty && !pending) save();
+  });
 
   return (
     <div>
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            if (dirty && !pending) save();
-          }
-        }}
-        rows={28}
-        spellCheck={false}
-        aria-label="CONTEXT.md"
-        placeholder="# Vault name&#10;&#10;Describe this vault and how AI clients should use it…"
-        className="block w-full rounded-xl border border-gray-300 px-3 py-2 font-mono text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-      />
+      <div>
+        {mode === 'visual' ? (
+          <VisualPane value={body} onChange={setBody} disabled={pending} controls={<ModeSwitch mode={mode} onChange={setMode} />} links={links} />
+        ) : (
+          <MarkdownPane value={body} onChange={setBody} mode={mode} onModeChange={setMode} disabled={pending} links={links} />
+        )}
+      </div>
       <div className="mt-3 flex items-center justify-end gap-3">
         <span className="text-xs text-gray-500">{dirty ? 'Unsaved changes' : 'All changes saved'}</span>
         <button type="button" onClick={save} disabled={!dirty || pending} className={buttonClass('primary')}>

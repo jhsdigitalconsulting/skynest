@@ -10,6 +10,7 @@ import { TableKit } from '@tiptap/extension-table';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { Placeholder } from '@tiptap/extensions';
 import { assetFileFromUrl, isVideoName } from '@/lib/vault-ui/assets';
+import { CELL_MIN_WIDTH } from './markdown-sync';
 
 interface LinkToken {
   raw?: string;
@@ -118,7 +119,7 @@ export function visualExtensions(placeholder: string, assetSrc: AssetSrc = (src)
     // Inline, so an image can sit inside a paragraph as it can in markdown.
     vaultImage(assetSrc),
     videoPreviews(assetSrc),
-    TableKit.configure({ table: { resizable: false, cellMinWidth: 120 } }),
+    TableKit.configure({ table: { resizable: true, cellMinWidth: CELL_MIN_WIDTH } }),
     TaskList,
     TaskItem.configure({ nested: true }),
     Placeholder.configure({ placeholder }),

@@ -51,3 +51,14 @@ describe('Markdown assets', () => {
     expect(html).toContain(`After /nests/abc/assets/${FILE}.mp4 inline`);
   });
 });
+
+describe('Markdown table column widths', () => {
+  it('sizes columns by the separator row dashes', () => {
+    const html = render('| a | b |\n| --- | --------- |\n| 1 | 2 |');
+    expect(html).toContain('<col style="width:25.00%"/><col style="width:75.00%"/>');
+  });
+
+  it('leaves an ordinary table alone', () => {
+    expect(render('| a | b |\n| --- | --- |\n| 1 | 2 |')).not.toContain('<colgroup>');
+  });
+});

@@ -17,6 +17,8 @@ import { DocSlashMenu } from './DocSlashMenu';
 import type { DocSlashMenuHandle } from './DocSlashMenu';
 import { LinkContextMenu } from './LinkContextMenu';
 import type { LinkMenuState } from './LinkContextMenu';
+import { TableContextMenu } from './TableContextMenu';
+import type { TableMenuState } from './TableContextMenu';
 import { removeLink } from './linking';
 import { loadMarkdown, toMarkdown } from './markdown-sync';
 import type { SourceMap } from './markdown-sync';
@@ -51,6 +53,7 @@ function linkDestination(href: string, links: VaultLinks): string | null {
 export function VisualPane({ value, onChange, disabled, controls, links }: VisualPaneProps) {
   const [dialog, setDialog] = useState<VisualDialog | null>(null);
   const [linkMenu, setLinkMenu] = useState<LinkMenuState | null>(null);
+  const [tableMenu, setTableMenu] = useState<TableMenuState | null>(null);
   const linksRef = useRef(links);
   useEffect(() => {
     linksRef.current = links;
@@ -102,14 +105,18 @@ export function VisualPane({ value, onChange, disabled, controls, links }: Visua
         return false;
       },
       handleDOMEvents: {
-        // Right-clicking a link offers to edit it; elsewhere the browser's own menu stays.
+        // Right-clicking a link or a table cell opens our menu; elsewhere the browser's own menu stays.
         contextmenu: (view, event) => {
-          const href = (event.target as HTMLElement).closest('a')?.getAttribute('href');
-          if (!href || !view.editable) return false;
+          const target = event.target as HTMLElement;
+          const href = target.closest('a')?.getAttribute('href');
+          const inTable = !!target.closest('td, th');
+          if ((!href && !inTable) || !view.editable) return false;
           const at = view.posAtCoords({ left: event.clientX, top: event.clientY });
           if (at) view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at.pos)));
           event.preventDefault();
-          setLinkMenu({ x: event.clientX, y: event.clientY, href });
+          const where = { x: event.clientX, y: event.clientY };
+          if (href) setLinkMenu({ ...where, href });
+          else setTableMenu(where);
           return true;
         },
       },
@@ -195,6 +202,7 @@ export function VisualPane({ value, onChange, disabled, controls, links }: Visua
           }}
         />
       )}
+      {editor && tableMenu && <TableContextMenu editor={editor} state={tableMenu} onClose={() => setTableMenu(null)} />}
       {editor && dialog && (
         <VisualDialogs editor={editor} dialog={dialog} docs={links.index.docs} vaultId={links.vaultId} onClose={() => setDialog(null)} />
       )}

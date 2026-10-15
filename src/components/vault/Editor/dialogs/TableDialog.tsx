@@ -1,6 +1,5 @@
 'use client';
 
-import { FIELD_INPUT } from '../../field-styles';
 import { useState } from 'react';
 import { Dialog } from '../../Dialog';
 import { buttonClass } from '../../button-styles';
@@ -9,30 +8,73 @@ import { useDialogFocus } from './useDialogFocus';
 export const MAX_TABLE_COLS = 12;
 export const MAX_TABLE_ROWS = 50;
 
+const MIN_VISIBLE_COLS = 8;
+const MIN_VISIBLE_ROWS = 5;
+
 export interface TableDialogProps {
   onClose: () => void;
   onSubmit: (rows: number, cols: number) => void;
 }
 
-const INPUT_CLASS = `mt-1 ${FIELD_INPUT}`;
+interface Size {
+  rows: number;
+  cols: number;
+}
 
-/** A whole number from `raw`, held between 1 and `max`; `fallback` when it isn't a number. */
-export function clampCount(raw: string, max: number, fallback: number): number {
-  const n = Math.trunc(Number(raw));
-  if (!Number.isFinite(n) || raw.trim() === '') return fallback;
+/** `n` held between 1 and `max`. */
+export function clampSize(n: number, max: number): number {
   return Math.min(Math.max(n, 1), max);
 }
 
-/** Pick the size of a new table. Rows include the header row. */
+/** Pick the size of a new table by pointing at a grid. Rows include the header row. */
 export function TableDialog({ onClose, onSubmit }: TableDialogProps) {
-  const [cols, setCols] = useState('3');
-  const [rows, setRows] = useState('3');
-  const colsRef = useDialogFocus<HTMLInputElement>();
+  const [size, setSize] = useState<Size>({ rows: 3, cols: 3 });
+  const gridRef = useDialogFocus<HTMLDivElement>();
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(clampCount(rows, MAX_TABLE_ROWS, 3), clampCount(cols, MAX_TABLE_COLS, 3));
+  // The grid grows one step past the highlighted cell, so a bigger table is always in reach.
+  const visibleCols = clampSize(Math.max(MIN_VISIBLE_COLS, size.cols + 1), MAX_TABLE_COLS);
+  const visibleRows = clampSize(Math.max(MIN_VISIBLE_ROWS, size.rows + 1), MAX_TABLE_ROWS);
+
+  const move = (dRows: number, dCols: number) =>
+    setSize((s) => ({
+      rows: clampSize(s.rows + dRows, MAX_TABLE_ROWS),
+      cols: clampSize(s.cols + dCols, MAX_TABLE_COLS),
+    }));
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    const step: Record<string, [number, number]> = {
+      ArrowUp: [-1, 0],
+      ArrowDown: [1, 0],
+      ArrowLeft: [0, -1],
+      ArrowRight: [0, 1],
+    };
+    if (step[e.key]) {
+      e.preventDefault();
+      move(...step[e.key]);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      onSubmit(size.rows, size.cols);
+    }
   };
+
+  const cells = [];
+  for (let r = 1; r <= visibleRows; r++) {
+    for (let c = 1; c <= visibleCols; c++) {
+      const active = r <= size.rows && c <= size.cols;
+      cells.push(
+        <div
+          key={`${r}-${c}`}
+          role="gridcell"
+          aria-selected={active}
+          onMouseEnter={() => setSize({ rows: r, cols: c })}
+          onClick={() => onSubmit(r, c)}
+          className={`h-5 w-5 cursor-pointer rounded-sm border ${
+            active ? 'border-indigo-500 bg-indigo-100' : 'border-gray-200 bg-gray-50'
+          }`}
+        />,
+      );
+    }
+  }
 
   return (
     <Dialog
@@ -45,37 +87,28 @@ export function TableDialog({ onClose, onSubmit }: TableDialogProps) {
           <button type="button" onClick={onClose} className={buttonClass('secondary')}>
             Cancel
           </button>
-          <button type="submit" form="table-form" className={buttonClass('primary')}>
+          <button type="button" onClick={() => onSubmit(size.rows, size.cols)} className={buttonClass('primary')}>
             Insert table
           </button>
         </>
       }
     >
-      <form id="table-form" onSubmit={submit} className="grid grid-cols-2 gap-3">
-        <label className="block text-sm font-medium text-gray-700">
-          Columns
-          <input
-            ref={colsRef}
-            type="number"
-            min={1}
-            max={MAX_TABLE_COLS}
-            value={cols}
-            onChange={(e) => setCols(e.target.value)}
-            className={INPUT_CLASS}
-          />
-        </label>
-        <label className="block text-sm font-medium text-gray-700">
-          Rows
-          <input
-            type="number"
-            min={1}
-            max={MAX_TABLE_ROWS}
-            value={rows}
-            onChange={(e) => setRows(e.target.value)}
-            className={INPUT_CLASS}
-          />
-        </label>
-      </form>
+      <div className="max-h-72 overflow-auto">
+        <div
+          ref={gridRef}
+          role="grid"
+          tabIndex={0}
+          aria-label="Table size. Use the arrow keys to resize and Enter to insert."
+          onKeyDown={onKeyDown}
+          className="mx-auto grid w-fit gap-1 rounded p-1 outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+          style={{ gridTemplateColumns: `repeat(${visibleCols}, 1.25rem)` }}
+        >
+          {cells}
+        </div>
+      </div>
+      <p className="mt-3 text-center text-sm font-medium text-gray-700" aria-live="polite">
+        {size.cols} × {size.rows}
+      </p>
     </Dialog>
   );
 }

@@ -6,6 +6,7 @@ import { FOCUS_RING } from './button-styles';
 import { usePopoverMenu } from './usePopoverMenu';
 
 interface Props {
+  app: { name: string; homeHref: string };
   viewer: {
     login: string;
     name: string | null;
@@ -17,7 +18,7 @@ interface Props {
 
 const ITEM = `block rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-none ${FOCUS_RING}`;
 
-export function UserMenu({ viewer }: Props) {
+export function UserMenu({ viewer, app }: Props) {
   const menu = usePopoverMenu();
   const role = viewer.isReviewer ? 'Reviewer' : viewer.access === 'write' ? 'Editor' : 'Read-only';
   const initial = (viewer.name ?? viewer.login).charAt(0).toUpperCase();
@@ -58,8 +59,8 @@ export function UserMenu({ viewer }: Props) {
             </span>
           </div>
           <div className="my-1 border-t border-gray-100" role="separator" />
-          <Link href="/" role="menuitem" data-menu-item onClick={menu.close} className={ITEM}>
-            Skynest home
+          <Link href={app.homeHref} role="menuitem" data-menu-item onClick={menu.close} className={ITEM}>
+            {app.name} home
           </Link>
           <Link href="/docs" role="menuitem" data-menu-item onClick={menu.close} className={ITEM}>
             Connect an MCP client

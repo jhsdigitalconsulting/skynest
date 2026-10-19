@@ -25,8 +25,10 @@ interface LayoutProps {
 export async function generateMetadata({ params }: { params: Promise<{ vaultId: string }> }): Promise<Metadata> {
   const { vaultId } = await params;
   const id = decodeURIComponent(vaultId);
-  const label = getVaultHost().vaults.find(id) ? await loadVaultName(id) : 'Vault';
-  return { title: { default: `${label} · Skynest`, template: `%s · ${label} · Skynest` } };
+  const host = getVaultHost();
+  const label = host.vaults.find(id) ? await loadVaultName(id) : 'Vault';
+  const app = host.branding.name;
+  return { title: { default: `${label} · ${app}`, template: `%s · ${label} · ${app}` } };
 }
 
 function Centered({ children }: { children: React.ReactNode }) {
@@ -63,8 +65,8 @@ export default async function VaultLayout({ children, params }: LayoutProps) {
           </div>
           <h1 className="text-lg font-semibold text-gray-900">{title}</h1>
           <p className="mt-2 text-sm text-gray-500">{body}</p>
-          <Link href="/" className={buttonClass('secondary', 'md', 'mt-6')}>
-            Back to Skynest
+          <Link href={host.branding.homeHref} className={buttonClass('secondary', 'md', 'mt-6')}>
+            Back to {host.branding.name}
           </Link>
         </div>
       </Centered>
@@ -91,9 +93,9 @@ export default async function VaultLayout({ children, params }: LayoutProps) {
         <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/90 backdrop-blur">
           <div className={`${PAGE_CONTAINER} flex h-14 items-center gap-2 sm:gap-4`}>
             <div className="flex min-w-0 shrink-0 items-center gap-2">
-              <Link href={urls.browse()} className="shrink-0" aria-label="Skynest home">
+              <Link href={urls.browse()} className="shrink-0" aria-label={`${host.branding.name} home`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/logo.jpg" alt="" className="h-7 w-7 rounded-md" />
+                <img src={host.branding.logoSrc} alt="" className="h-7 w-7 rounded-md" />
               </Link>
               <span aria-hidden className="text-gray-300">/</span>
               <VaultSwitcher vaults={vaults} currentId={vault.id} />
@@ -127,7 +129,7 @@ export default async function VaultLayout({ children, params }: LayoutProps) {
                 <Icon name="settings" className="h-5 w-5" />
               </Link>
             )}
-            <UserMenu viewer={{ login: viewer.login, name: viewer.name, image: viewer.image, access: viewer.access, isReviewer: viewer.isReviewer }} />
+            <UserMenu viewer={{ login: viewer.login, name: viewer.name, image: viewer.image, access: viewer.access, isReviewer: viewer.isReviewer }} app={{ name: host.branding.name, homeHref: host.branding.homeHref }} />
           </div>
         </header>
         <div className="flex-1">{children}</div>

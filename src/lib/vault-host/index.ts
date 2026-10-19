@@ -83,6 +83,7 @@ const gitSync: GitSyncHost = {
 
 /** Skynest's implementation of what the vault UI needs from its host. */
 export const vaultHost: VaultHost = {
+  branding: { name: 'Skynest', homeHref: '/', logoSrc: '/logo.jpg' },
   vaults: { list: listVaults, find: findVault, defaultId: getDefaultVaultId },
   setting: envForVault,
   identity,

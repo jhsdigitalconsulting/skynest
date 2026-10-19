@@ -68,7 +68,16 @@ export interface GitSyncHost {
   isBusyError(err: unknown): boolean;
 }
 
+/** How the hosting app presents itself around the vault UI. */
+export interface HostBranding {
+  name: string;
+  /** Where "back to the app" links go. */
+  homeHref: string;
+  logoSrc: string;
+}
+
 export interface VaultHost {
+  branding: HostBranding;
   vaults: {
     list(): VaultInfo[];
     find(vaultId: string): VaultInfo | null;

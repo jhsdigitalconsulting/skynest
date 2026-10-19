@@ -8,6 +8,7 @@ WORKDIR /app
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY vendor/packages/engine/package.json ./vendor/packages/engine/package.json
 COPY vendor/packages/engine/dist ./vendor/packages/engine/dist
+COPY packages/vault-ui/package.json ./packages/vault-ui/package.json
 
 RUN corepack enable pnpm && pnpm install --frozen-lockfile
 

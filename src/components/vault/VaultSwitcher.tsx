@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { vaultUrls } from '@/lib/vault-ui/paths';
 import { Icon } from './Icon';
+import { FOCUS_RING } from './button-styles';
+import { usePopoverMenu } from './usePopoverMenu';
 
 interface VaultOption {
   id: string;
@@ -45,24 +46,9 @@ function VaultMark({ vault }: { vault: VaultOption }) {
 
 /** Shows which vault is open and, when there's more than one, switches between them. */
 export function VaultSwitcher({ vaults, currentId }: Props) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const menu = usePopoverMenu();
   const current = vaults.find((v) => v.id === currentId) ?? { id: currentId, label: currentId };
   const canSwitch = vaults.length > 1;
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
 
   const label = (
     <>
@@ -76,42 +62,52 @@ export function VaultSwitcher({ vaults, currentId }: Props) {
   }
 
   return (
-    <div ref={ref} className="relative min-w-0">
+    <div ref={menu.rootRef} className="relative min-w-0">
       <button
+        ref={menu.triggerRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
+        onClick={menu.toggle}
+        onKeyDown={menu.onTriggerKeyDown}
+        aria-haspopup="menu"
+        aria-expanded={menu.open}
         aria-label={`Vault: ${current.label}. Switch vault`}
-        className="flex h-9 min-w-0 items-center gap-2 rounded-lg px-2 hover:bg-gray-100"
+        className={`flex h-9 min-w-0 items-center gap-2 rounded-lg px-2 hover:bg-gray-100 ${FOCUS_RING}`}
       >
         {label}
-        <Icon name="chevronDown" className="h-4 w-4 shrink-0 text-gray-400" />
+        <Icon name="chevronDown" className="h-4 w-4 shrink-0 text-gray-500" />
       </button>
-      {open && (
-        <div className="absolute left-0 z-40 mt-2 w-64 rounded-xl bg-white p-1.5 text-sm shadow-lg ring-1 ring-gray-200">
-          <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Vaults</p>
-          <ul role="listbox" aria-label="Vaults">
-            {vaults.map((vault) => {
-              const selected = vault.id === current.id;
-              return (
-                <li key={vault.id} role="option" aria-selected={selected}>
-                  <Link
-                    href={vaultUrls(vault.id).browse()}
-                    onClick={() => setOpen(false)}
-                    className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-gray-50 ${selected ? 'bg-gray-50' : ''}`}
-                  >
-                    <VaultMark vault={vault} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium text-gray-900">{vault.label}</span>
-                      <span className="block truncate font-mono text-xs text-gray-400">{vault.id}</span>
-                    </span>
-                    {selected && <Icon name="check" className="h-4 w-4 shrink-0 text-indigo-600" />}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+      {menu.open && (
+        <div
+          ref={menu.menuRef}
+          role="menu"
+          aria-label="Vaults"
+          onKeyDown={menu.onMenuKeyDown}
+          className="absolute left-0 z-40 mt-2 w-64 rounded-xl bg-white p-1.5 text-sm shadow-lg ring-1 ring-gray-200"
+        >
+          <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500" aria-hidden>
+            Vaults
+          </p>
+          {vaults.map((vault) => {
+            const selected = vault.id === current.id;
+            return (
+              <Link
+                key={vault.id}
+                href={vaultUrls(vault.id).browse()}
+                role="menuitem"
+                data-menu-item
+                aria-current={selected ? 'true' : undefined}
+                onClick={menu.close}
+                className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-gray-50 focus-visible:bg-gray-50 ${FOCUS_RING} ${selected ? 'bg-gray-50' : ''}`}
+              >
+                <VaultMark vault={vault} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium text-gray-900">{vault.label}</span>
+                  <span className="block truncate font-mono text-xs text-gray-500">{vault.id}</span>
+                </span>
+                {selected && <Icon name="check" className="h-4 w-4 shrink-0 text-indigo-600" />}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

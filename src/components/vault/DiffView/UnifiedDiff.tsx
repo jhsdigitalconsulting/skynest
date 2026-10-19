@@ -9,7 +9,14 @@ interface Props {
 
 export function UnifiedDiff({ rows, onExpand }: Props) {
   return (
-    <table className="diff-table w-full border-collapse font-mono text-[13px] leading-6">
+    <table className="diff-table w-full table-fixed border-collapse font-mono text-[13px] leading-6">
+      {/* Fixed layout so one long line wraps instead of pushing the table wider than the page. */}
+      <colgroup>
+        <col className="w-10" />
+        <col className="w-10" />
+        <col className="w-5" />
+        <col />
+      </colgroup>
       <tbody>
         {rows.map((row, i) =>
           row.kind === 'gap' ? (
@@ -19,7 +26,7 @@ export function UnifiedDiff({ rows, onExpand }: Props) {
               <td className={`w-10 select-none px-2 text-right text-xs ${GUTTER_BG[row.kind]}`}>{row.oldNo ?? ''}</td>
               <td className={`w-10 select-none px-2 text-right text-xs ${GUTTER_BG[row.kind]}`}>{row.newNo ?? ''}</td>
               <td className={`w-5 select-none text-center ${GUTTER_BG[row.kind]}`}>{SIGN[row.kind]}</td>
-              <td className="whitespace-pre-wrap break-words px-3 text-gray-800">
+              <td className="whitespace-pre-wrap break-words px-3 text-gray-800 [overflow-wrap:anywhere]">
                 <LineText line={row} />
               </td>
             </tr>

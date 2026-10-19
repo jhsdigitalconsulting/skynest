@@ -1,5 +1,6 @@
 'use client';
 
+import { FIELD_INPUT } from '../../field-styles';
 import { useState } from 'react';
 import { Dialog } from '../../Dialog';
 import { buttonClass } from '../../button-styles';
@@ -9,15 +10,14 @@ import { useDialogFocus } from './useDialogFocus';
 export interface UrlLinkDialogProps {
   /** The current link's URL when editing one. */
   initialHref: string;
-  /** Ask for the text to show, for when nothing is selected. */
-  askText: boolean;
+  /** The link's current text, or the selected text; empty when there is neither. */
+  initialText: string;
   onClose: () => void;
   onSubmit: (href: string, text: string) => void;
   onRemove: () => void;
 }
 
-const INPUT_CLASS =
-  'mt-1 h-10 w-full rounded-lg border-0 px-3 text-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-500';
+const INPUT_CLASS = `mt-1 ${FIELD_INPUT}`;
 
 /** `example.com` → `https://example.com`; leaves anything with a scheme, a path or an anchor alone. */
 export function normalizeHref(raw: string): string {
@@ -27,16 +27,16 @@ export function normalizeHref(raw: string): string {
 }
 
 /** Add or edit a link to a web page. Links to documents in the vault use DocLinkDialog. */
-export function UrlLinkDialog({ initialHref, askText, onClose, onSubmit, onRemove }: UrlLinkDialogProps) {
+export function UrlLinkDialog({ initialHref, initialText, onClose, onSubmit, onRemove }: UrlLinkDialogProps) {
   const [href, setHref] = useState(initialHref);
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText);
   const inputRef = useDialogFocus<HTMLInputElement>();
   const editing = Boolean(initialHref);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const url = normalizeHref(href);
-    if (url) onSubmit(url, text.trim() || url);
+    if (url) onSubmit(url, text.trim());
     else if (editing) onRemove();
   };
 
@@ -75,18 +75,16 @@ export function UrlLinkDialog({ initialHref, askText, onClose, onSubmit, onRemov
             className={INPUT_CLASS}
           />
         </label>
-        {askText && (
-          <label className="block text-sm font-medium text-gray-700">
-            Text <span className="font-normal text-gray-400">(optional)</span>
-            <input
-              type="text"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Defaults to the URL"
-              className={INPUT_CLASS}
-            />
-          </label>
-        )}
+        <label className="block text-sm font-medium text-gray-700">
+          Link text <span className="font-normal text-gray-400">(optional)</span>
+          <input
+            type="text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Defaults to the URL"
+            className={INPUT_CLASS}
+          />
+        </label>
       </form>
     </Dialog>
   );

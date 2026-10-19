@@ -1,19 +1,27 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { VersionManager } from '@promptowl/contextnest-engine';
+import {
+  VersionManager,
+  approveSuggestion,
+  rejectSuggestion,
+  serializeDocument,
+} from '@promptowl/contextnest-engine';
+import type { RbacHook } from '@promptowl/contextnest-engine';
 import {
   ReviewError,
   approveDraft,
+  approveDrafts,
   commentOnDraft,
   discardDraft,
+  listDrafts,
   normalizeDocId,
   requestChanges,
   saveDraft,
   submitDraft,
   withdrawDraft,
 } from '@/lib/review';
-import type { DraftChanges } from '@/lib/review';
+import type { BulkApproveItem, DraftChanges } from '@/lib/review';
 import {
   VaultAuthError,
   actorFor,
@@ -21,7 +29,10 @@ import {
   requireWriter,
 } from '@/lib/vault-ui/context';
 import { vaultUrls } from '@/lib/vault-ui/paths';
+import { nextInReview } from '@/lib/vault-ui/review-queue';
 import type { ActionResult, EditorFields } from '@/lib/vault-ui/types';
+import { applySettings } from '@/lib/vault-ui/vault-settings';
+import type { VaultSettingsInput } from '@/lib/vault-ui/vault-settings';
 
 async function run(fn: () => Promise<ActionResult>): Promise<ActionResult> {
   try {
@@ -52,6 +63,8 @@ export interface SaveInput {
   fields: EditorFields;
   /** Revision the editor loaded; null when no draft existed yet. */
   expectedRevision: number | null;
+  /** Set when editing inside the review queue: the queue tab to return to. */
+  queueList?: string;
 }
 
 export async function saveDraftAction(vaultId: string, input: SaveInput): Promise<ActionResult> {
@@ -90,7 +103,7 @@ export async function submitForReviewAction(
     return {
       ok: true,
       message: 'Submitted for review',
-      redirectTo: vaultUrls(vaultId).reviewDraft(draft.docId),
+      redirectTo: vaultUrls(vaultId).reviewDraft(draft.docId, undefined, input.queueList),
     };
   });
 }
@@ -104,6 +117,7 @@ export async function publishNowAction(vaultId: string, input: SaveInput & { not
     }
     const { storage, sync, userToken } = engineFor(viewer, vaultId);
     const actor = actorFor(viewer);
+    const before = input.queueList ? await listDrafts(storage, { status: 'in_review' }) : [];
     const draft = await saveDraft(
       { storage, actor },
       {
@@ -116,11 +130,12 @@ export async function publishNowAction(vaultId: string, input: SaveInput & { not
     const result = await approveDraft({ storage, sync, userToken, actor }, draft.docId, {
       note: input.note,
     });
-    return {
-      ok: true,
-      message: `Published v${result.version}`,
-      redirectTo: vaultUrls(vaultId).doc(draft.docId),
-    };
+    // Editing from the review queue: carry on with the next item rather than leaving it.
+    const inQueue = input.queueList !== undefined;
+    const redirectTo = inQueue
+      ? (advanceTo(vaultId, before, draft.docId, draft.docId) ?? vaultUrls(vaultId).review(input.queueList))
+      : vaultUrls(vaultId).doc(draft.docId);
+    return { ok: true, message: `Published v${result.version}`, redirectTo };
   });
 }
 
@@ -166,33 +181,101 @@ export async function commentAction(vaultId: string, docId: string, message: str
   });
 }
 
-export async function requestChangesAction(vaultId: string, docId: string, message: string): Promise<ActionResult> {
+/**
+ * Where to go once `docId` has left the review queue: the item that took its place.
+ * `current` is the document open in the review pane; when the action was about some
+ * other document the pane stays put (null).
+ */
+function advanceTo(
+  vaultId: string,
+  drafts: Awaited<ReturnType<typeof listDrafts>>,
+  docId: string,
+  current: string | null,
+  gone: readonly string[] = [],
+): string | null {
+  if (current === null || (current !== docId && !gone.includes(current))) return null;
+  const next = nextInReview(drafts, current, gone);
+  return next ? vaultUrls(vaultId).reviewDraft(next, undefined, 'review') : null;
+}
+
+export async function requestChangesAction(
+  vaultId: string,
+  docId: string,
+  message: string,
+  options: { current?: string | null } = {},
+): Promise<ActionResult> {
   return run(async () => {
     const viewer = await requireWriter();
     const { storage } = engineFor(viewer, vaultId);
+    const before = await listDrafts(storage, { status: 'in_review' });
     await requestChanges({ storage, actor: actorFor(viewer) }, docId, message);
-    return { ok: true, message: 'Changes requested — the author has been sent your feedback' };
+    const id = normalizeDocId(docId);
+    const redirectTo = advanceTo(vaultId, before, id, options.current === undefined ? id : options.current);
+    return {
+      ok: true,
+      message: 'Changes requested — the author has been sent your feedback',
+      ...(redirectTo ? { redirectTo } : {}),
+    };
   });
 }
 
 export async function approveAction(
   vaultId: string,
   docId: string,
-  options: { note?: string; force?: boolean; expectedRevision?: number } = {},
+  options: { note?: string; force?: boolean; expectedRevision?: number; current?: string | null } = {},
 ): Promise<ActionResult> {
   return run(async () => {
     const viewer = await requireWriter();
     const { storage, sync, userToken } = engineFor(viewer, vaultId);
+    const { current, ...approveOptions } = options;
+    const id = normalizeDocId(docId);
+    const before = await listDrafts(storage, { status: 'in_review' });
     const result = await approveDraft(
       { storage, sync, userToken, actor: actorFor(viewer) },
       docId,
-      options,
+      approveOptions,
     );
-    return {
-      ok: true,
-      message: `Approved and published v${result.version}`,
-      redirectTo: vaultUrls(vaultId).doc(normalizeDocId(docId)),
-    };
+    const waiting = before.length - 1;
+    const viewing = current === undefined ? id : current;
+    const next = advanceTo(vaultId, before, id, viewing);
+    const message = waiting
+      ? `Approved and published v${result.version} · ${waiting} more waiting for review`
+      : `Approved and published v${result.version}`;
+    // A reviewer working the queue wants the next item, not the doc they just approved.
+    // With nothing left (or the approval was for another item), open the doc or stay put.
+    if (next) return { ok: true, message, redirectTo: next };
+    if (viewing === id) return { ok: true, message, redirectTo: vaultUrls(vaultId).doc(id) };
+    return { ok: true, message };
+  });
+}
+
+/** Approve several drafts in one go. Stale drafts are skipped, never force-published. */
+export async function bulkApproveAction(
+  vaultId: string,
+  items: BulkApproveItem[],
+  options: { note?: string; current?: string | null } = {},
+): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireWriter();
+    if (items.length === 0) return { ok: false, error: 'Nothing selected.' };
+    const { storage, sync, userToken } = engineFor(viewer, vaultId);
+    const before = await listDrafts(storage, { status: 'in_review' });
+    const res = await approveDrafts({ storage, sync, userToken, actor: actorFor(viewer) }, items, {
+      note: options.note,
+    });
+    const parts = [`Approved ${res.approved.length}`];
+    if (res.skipped.length) parts.push(`${res.skipped.length} skipped (out of date)`);
+    if (res.failed.length) parts.push(`${res.failed.length} failed (${res.failed[0].error})`);
+    const message = parts.join(' · ');
+    if (res.approved.length === 0) return { ok: false, error: message };
+    const gone = res.approved.map((a) => a.docId);
+    const current = options.current ?? null;
+    // When the open item was approved, move on to whatever is next (or back to the empty queue).
+    const redirectTo =
+      current && gone.includes(current)
+        ? (advanceTo(vaultId, before, current, current, gone) ?? vaultUrls(vaultId).review())
+        : null;
+    return { ok: true, message, ...(redirectTo ? { redirectTo } : {}) };
   });
 }
 
@@ -209,5 +292,120 @@ export async function restoreVersionAction(vaultId: string, docId: string, versi
       message: `Started a draft from v${version}`,
       redirectTo: vaultUrls(vaultId).edit(id),
     };
+  });
+}
+
+/** Overwrite the vault's CONTEXT.md. It's the vault-level system prompt, so only reviewers may change it. */
+export async function saveContextMdAction(vaultId: string, content: string): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireWriter();
+    if (!viewer.isReviewer) {
+      return { ok: false, error: 'Only reviewers can edit the vault instructions.', code: 'forbidden' };
+    }
+    const { storage } = engineFor(viewer, vaultId);
+    await storage.writeContextMd(content);
+    return { ok: true, message: 'Vault instructions saved' };
+  });
+}
+
+// Zone RBAC isn't enforced per call in the hosted vault (see the MCP tools); the reviewer check below is the gate.
+const permissiveRbac: RbacHook = {
+  isCzar: () => true,
+  canIngest: () => true,
+  isDocOwner: () => true,
+};
+
+/** Apply a drift suggestion: patches the document and publishes it as a new version. Reviewer-only. */
+export async function approveSuggestionAction(
+  vaultId: string,
+  docId: string,
+  suggestionId: string,
+  comment?: string,
+): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireWriter();
+    if (!viewer.isReviewer) {
+      return { ok: false, error: 'Only reviewers can apply suggestions.', code: 'forbidden' };
+    }
+    const { storage, sync, userToken } = engineFor(viewer, vaultId);
+    const id = normalizeDocId(docId);
+    const node = await storage.readDocument(id);
+    const result = await approveSuggestion({
+      storage,
+      rbac: permissiveRbac,
+      documentId: id,
+      actor: viewer.login,
+      zone: node.frontmatter.zone ?? 'default',
+      suggestionId,
+      comment: comment || undefined,
+    });
+    await storage.regenerateIndex();
+    const updated = await storage.readDocument(id);
+    await sync.commitFile({
+      path: `${id}.md`,
+      content: Buffer.from(serializeDocument(updated), 'utf-8'),
+      message: `approve suggestion ${suggestionId} on ${id}`,
+      editedBy: viewer.login,
+      userToken,
+    });
+    return { ok: true, message: `Suggestion applied — published v${result.versionEntry.version}` };
+  });
+}
+
+/** Dismiss a drift suggestion. The document is untouched; the suggestion is archived with the reason. */
+export async function rejectSuggestionAction(
+  vaultId: string,
+  docId: string,
+  suggestionId: string,
+  reason: string,
+): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireWriter();
+    if (!viewer.isReviewer) {
+      return { ok: false, error: 'Only reviewers can dismiss suggestions.', code: 'forbidden' };
+    }
+    if (!reason.trim()) return { ok: false, error: 'Add a reason for dismissing the suggestion.' };
+    const { storage } = engineFor(viewer, vaultId);
+    const id = normalizeDocId(docId);
+    const node = await storage.readDocument(id);
+    await rejectSuggestion({
+      storage,
+      rbac: permissiveRbac,
+      documentId: id,
+      actor: viewer.login,
+      zone: node.frontmatter.zone ?? 'default',
+      suggestionId,
+      reason: reason.trim(),
+    });
+    return { ok: true, message: 'Suggestion dismissed' };
+  });
+}
+
+/**
+ * Save the Settings page to .context/config.yaml and commit it. Settings the page
+ * doesn't edit (version, servers, sync…) are kept as they are. Reviewer-only.
+ */
+export async function saveVaultSettingsAction(vaultId: string, input: VaultSettingsInput): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireWriter();
+    if (!viewer.isReviewer) {
+      return { ok: false, error: 'Only reviewers can change the vault settings.', code: 'forbidden' };
+    }
+    const { storage, sync, userToken } = engineFor(viewer, vaultId);
+    const [config, nodes] = await Promise.all([storage.readConfig(), storage.discoverDocuments()]);
+    const result = applySettings(config, input, new Set(nodes.map((n) => n.id)));
+    if (!result.ok) return { ok: false, error: result.error };
+    await storage.writeConfig(result.config);
+    const written = await storage.provider.read('.context/config.yaml');
+    if (written) {
+      await sync.commitFile({
+        path: '.context/config.yaml',
+        content: written,
+        message: 'update vault settings',
+        editedBy: viewer.login,
+        userToken,
+      });
+    }
+    return { ok: true, message: 'Vault settings saved' };
   });
 }

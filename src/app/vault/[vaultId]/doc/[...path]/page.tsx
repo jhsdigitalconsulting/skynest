@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { getDraft, readDocumentOrNull, summarizeDraft } from '@/lib/review';
+import { getDraft, readDocumentOrNull, staleReasonFor, summarizeDraft } from '@/lib/review';
 import { DiffView } from '@/components/vault/DiffView';
 import { DocBreadcrumbs } from '@/components/vault/DocBreadcrumbs';
+import { ContentViewSwitch } from '@/components/vault/ContentViewSwitch';
+import { CopyButton } from '@/components/vault/CopyButton';
 import { DocDetails } from '@/components/vault/DocDetails';
 import { Icon } from '@/components/vault/Icon';
 import { Markdown } from '@/components/vault/Markdown';
@@ -11,7 +13,7 @@ import { RestoreVersionButton } from '@/components/vault/RestoreVersionButton';
 import { DocStatusBadge, TypeBadge } from '@/components/vault/StatusBadge';
 import { Tabs } from '@/components/vault/Tabs';
 import { VersionHistory } from '@/components/vault/VersionHistory';
-import { buttonClass } from '@/components/vault/button-styles';
+import { FOCUS_RING, buttonClass } from '@/components/vault/button-styles';
 import { PAGE_CONTAINER } from '@/components/vault/layout-styles';
 import { engineFor, requireViewer } from '@/lib/vault-ui/context';
 import { loadLinkIndex } from '@/lib/vault-ui/data';
@@ -20,7 +22,7 @@ import { decodeSegments, vaultUrls } from '@/lib/vault-ui/paths';
 
 interface Props {
   params: Promise<{ vaultId: string; path: string[] }>;
-  searchParams: Promise<{ tab?: string; v?: string }>;
+  searchParams: Promise<{ tab?: string; v?: string; view?: string }>;
 }
 
 export async function generateMetadata({ params }: Props) {
@@ -29,7 +31,7 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function DocPage({ params, searchParams }: Props) {
-  const [{ vaultId, path }, { tab, v }] = await Promise.all([params, searchParams]);
+  const [{ vaultId, path }, { tab, v, view }] = await Promise.all([params, searchParams]);
   const urls = vaultUrls(vaultId);
   const docId = decodeSegments(path);
   const viewer = await requireViewer();
@@ -46,6 +48,7 @@ export default async function DocPage({ params, searchParams }: Props) {
   const canWrite = viewer.access === 'write';
   const [history, linkIndex] = await Promise.all([loadHistory(storage, docId), loadLinkIndex(vaultId)]);
   const activeTab = tab === 'history' ? 'history' : 'content';
+  const showSource = activeTab === 'content' && view === 'markdown';
   const selectedVersion = activeTab === 'history' && v ? Number.parseInt(v, 10) : null;
   const versionSnapshot =
     selectedVersion !== null && Number.isFinite(selectedVersion)
@@ -59,7 +62,7 @@ export default async function DocPage({ params, searchParams }: Props) {
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{fm.title || docId}</h1>
+            <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight text-gray-900 [overflow-wrap:anywhere]">{fm.title || docId}</h1>
             <DocStatusBadge status={fm.status ?? 'draft'} version={fm.version} />
             {fm.type && fm.type !== 'document' && <TypeBadge type={fm.type} />}
           </div>
@@ -70,7 +73,7 @@ export default async function DocPage({ params, searchParams }: Props) {
                 <Link
                   key={tag}
                   href={urls.browse({ q: tag })}
-                  className="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600 hover:bg-indigo-50 hover:text-indigo-700"
+                  className={`rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 ${FOCUS_RING}`}
                 >
                   {tag}
                 </Link>
@@ -80,12 +83,6 @@ export default async function DocPage({ params, searchParams }: Props) {
         </div>
         {canWrite && (
           <div className="flex shrink-0 gap-2">
-            {draft ? (
-              <Link href={urls.reviewDraft(docId)} className={buttonClass('secondary')}>
-                <Icon name="diff" />
-                View draft
-              </Link>
-            ) : null}
             <Link href={urls.edit(docId)} className={buttonClass('primary')}>
               <Icon name="edit" />
               {draft ? 'Edit draft' : 'Edit'}
@@ -96,7 +93,12 @@ export default async function DocPage({ params, searchParams }: Props) {
 
       {draft && (
         <div className="mt-5">
-          <PendingDraftBanner vaultId={vaultId} draft={summarizeDraft(draft)} canEdit={canWrite} />
+          <PendingDraftBanner
+            vaultId={vaultId}
+            draft={summarizeDraft(draft)}
+            canEdit={canWrite}
+            reviewer={canWrite && viewer.isReviewer ? { staleReason: staleReasonFor(draft, node) } : undefined}
+          />
         </div>
       )}
 
@@ -113,13 +115,25 @@ export default async function DocPage({ params, searchParams }: Props) {
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0">
           {activeTab === 'content' ? (
-            <article className="rounded-xl bg-white px-6 py-8 shadow-sm ring-1 ring-gray-200 sm:px-10">
-              {node.body.trim() ? (
-                <Markdown source={node.body} links={{ vaultId, index: linkIndex }} />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <ContentViewSwitch active={showSource ? 'markdown' : 'preview'} previewHref={urls.doc(docId)} markdownHref={urls.doc(docId, { view: 'markdown' })} />
+                {showSource && <CopyButton value={node.rawContent} label="Copy markdown" />}
+              </div>
+              {showSource ? (
+                <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl bg-white px-6 py-6 font-mono text-[13px] leading-6 text-gray-800 shadow-sm ring-1 ring-gray-200 [overflow-wrap:anywhere] sm:px-10">
+                  {node.rawContent}
+                </pre>
               ) : (
-                <p className="text-center text-sm text-gray-400">This document has no content yet.</p>
+                <article className="rounded-xl bg-white px-6 py-8 shadow-sm ring-1 ring-gray-200 sm:px-10">
+                  {node.body.trim() ? (
+                    <Markdown source={node.body} links={{ vaultId, index: linkIndex }} />
+                  ) : (
+                    <p className="text-center text-sm text-gray-500">This document has no content yet.</p>
+                  )}
+                </article>
               )}
-            </article>
+            </div>
           ) : selectedVersion !== null ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-indigo-50 px-4 py-3 ring-1 ring-indigo-100">

@@ -8,7 +8,7 @@ interface Props {
   onClose: () => void;
   title: string;
   description?: React.ReactNode;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   footer?: React.ReactNode;
 }
 
@@ -30,7 +30,7 @@ export function Dialog({ open, onClose, title, description, children, footer }: 
       onClick={(e) => {
         if (e.target === ref.current) onClose();
       }}
-      className="vault-dialog m-auto w-full max-w-lg rounded-2xl bg-white p-0 shadow-2xl ring-1 ring-gray-200"
+      className="vault-dialog m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-2xl bg-white p-0 shadow-2xl ring-1 ring-gray-200"
     >
       {open && (
         <div className="flex flex-col">
@@ -42,13 +42,13 @@ export function Dialog({ open, onClose, title, description, children, footer }: 
             <button
               type="button"
               onClick={onClose}
-              className="-mr-2 rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="-mr-2 rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
               aria-label="Close"
             >
               <Icon name="x" className="h-4 w-4" />
             </button>
           </div>
-          <div className="px-6 py-4">{children}</div>
+          {children ? <div className="px-6 py-4">{children}</div> : <div className="h-4" />}
           {footer && (
             <div className="flex justify-end gap-2 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-3">
               {footer}

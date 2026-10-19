@@ -1,8 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getDraft, readDocumentOrNull } from '@/lib/review';
+import { getDraft, readDocumentOrNull, staleReasonFor } from '@/lib/review';
 import type { Draft } from '@/lib/review';
-import type { ContextNode } from '@promptowl/contextnest-engine';
 import { ActivityThread } from '@/components/vault/ActivityThread';
 import { DiffView } from '@/components/vault/DiffView';
 import { DocBreadcrumbs } from '@/components/vault/DocBreadcrumbs';
@@ -14,31 +13,21 @@ import { ReviewActions } from '@/components/vault/ReviewActions';
 import { DraftStatusBadge, NewBadge, TypeBadge } from '@/components/vault/StatusBadge';
 import { Tabs } from '@/components/vault/Tabs';
 import { buttonClass } from '@/components/vault/button-styles';
-import { PAGE_CONTAINER } from '@/components/vault/layout-styles';
 import { engineFor, requireViewer } from '@/lib/vault-ui/context';
-import { loadLinkIndex } from '@/lib/vault-ui/data';
+import { Editor } from '@/components/vault/Editor';
+import { draftLockReason, loadFolders } from '@/lib/vault-ui/editor-data';
+import { folderOf, loadLinkIndex } from '@/lib/vault-ui/data';
 import { parseSnapshot, snapshotOf } from '@/lib/vault-ui/doc-data';
 import { decodeSegments, vaultUrls } from '@/lib/vault-ui/paths';
 
 interface Props {
   params: Promise<{ vaultId: string; path: string[] }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; list?: string; edit?: string }>;
 }
 
 export async function generateMetadata({ params }: Props) {
   const { path } = await params;
   return { title: `Review · ${decodeSegments(path)}` };
-}
-
-function staleReasonFor(draft: Draft, node: ContextNode | null): string | null {
-  if (draft.isNew && node) {
-    return `Someone published “${draft.docId}” after this draft was started. Approving will overwrite it.`;
-  }
-  const live = node?.frontmatter.version ?? null;
-  if (!draft.isNew && node && live !== draft.baseVersion) {
-    return `The published document moved to v${live} after this draft was started from v${draft.baseVersion ?? '–'}. Approving will replace those newer changes.`;
-  }
-  return null;
 }
 
 function involves(draft: Draft, login: string): boolean {
@@ -47,7 +36,7 @@ function involves(draft: Draft, login: string): boolean {
 }
 
 export default async function ReviewDraftPage({ params, searchParams }: Props) {
-  const [{ vaultId, path }, { tab }] = await Promise.all([params, searchParams]);
+  const [{ vaultId, path }, { tab, list, edit }] = await Promise.all([params, searchParams]);
   const urls = vaultUrls(vaultId);
   const docId = decodeSegments(path);
   const viewer = await requireViewer();
@@ -77,6 +66,26 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
     );
   }
 
+  if (edit === '1' && viewer.access === 'write') {
+    const folders = await loadFolders(vaultId);
+    return (
+      <Editor
+        key={docId}
+        docId={docId}
+        isNew={draft.isNew}
+        initial={parseSnapshot(docId, draft.content)}
+        revision={draft.revision}
+        status={draft.status}
+        isReviewer={viewer.isReviewer}
+        defaultFolder={folderOf(docId)}
+        folders={folders}
+        lockedReason={draftLockReason(draft, viewer)}
+        linkIndex={linkIndex}
+        queueList={list ?? ''}
+      />
+    );
+  }
+
   const after = parseSnapshot(docId, draft.content);
   const before = node ? snapshotOf(node) : null;
   const liveVersion = node?.frontmatter.version ?? null;
@@ -88,22 +97,40 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
       ? [...draft.activity].reverse().find((a) => a.kind === 'changes_requested')
       : undefined;
 
-  const active = tab === 'preview' ? 'preview' : tab === 'current' && node ? 'current' : 'changes';
+  // The note the author left when they last sent it for review.
+  const submitNote = [...draft.activity].reverse().find((a) => a.kind === 'submitted');
+
+  const actions = (
+    <ReviewActions
+      docId={docId}
+      status={draft.status}
+      revision={draft.revision}
+      canWrite={canWrite}
+      isReviewer={viewer.isReviewer}
+      canManage={canManage}
+      staleReason={staleReason}
+      queueList={list ?? ''}
+    />
+  );
+
+  // Preview first: most reviews start by reading the draft as it will appear, then checking the diff.
+  const active = tab === 'changes' ? 'changes' : tab === 'current' && node ? 'current' : 'preview';
   const others = draft.contributors.filter((c) => c !== draft.author);
 
   return (
-    <div className={`${PAGE_CONTAINER} py-6`}>
+    <div className="px-4 py-6 sm:px-6 lg:px-8">
       <div className="flex items-center gap-3 text-sm">
-        <Link href={urls.review()} className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-900">
+        {/* The queue is always on screen beside the draft on wide screens, so the way back is only needed below that. */}
+        <Link href={urls.review(list)} className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-900 lg:hidden">
           <Icon name="arrowLeft" className="h-3.5 w-3.5" />
           Review queue
         </Link>
-        <span className="text-gray-300">/</span>
+        <span className="text-gray-300 lg:hidden">/</span>
         <DocBreadcrumbs vaultId={vaultId} docId={docId} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{after.title || docId}</h1>
+        <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight text-gray-900 [overflow-wrap:anywhere]">{after.title || docId}</h1>
         <DraftStatusBadge status={draft.status} />
         {draft.isNew && <NewBadge />}
         {after.type !== 'document' && <TypeBadge type={after.type} />}
@@ -113,6 +140,11 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
         {others.length > 0 && <> with {others.join(', ')}</>}
         {draft.isNew ? ' · new document' : ` · based on v${draft.baseVersion ?? '–'}`}
         {' · '}revision {draft.revision}
+        {submitNote && (
+          <>
+            {' · '}submitted <RelativeTime iso={submitNote.at} />
+          </>
+        )}
         {' · '}updated <RelativeTime iso={draft.updatedAt} />
         {node && (
           <>
@@ -123,6 +155,18 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
           </>
         )}
       </p>
+
+      {submitNote?.message && !lastFeedback?.message && (
+        <div className="mt-5 flex gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+          <Icon name="send" className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
+          <div className="min-w-0 text-sm">
+            <p className="font-medium text-indigo-900">
+              {submitNote.actor}&rsquo;s note <span className="font-normal text-indigo-700">· submitted <RelativeTime iso={submitNote.at} /></span>
+            </p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-indigo-900">{submitNote.message}</p>
+          </div>
+        </div>
+      )}
 
       {lastFeedback?.message && (
         <div className="mt-5 flex gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
@@ -136,20 +180,23 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
         </div>
       )}
 
+      {/* On small screens the sidebar falls below the diff, so show the actions up front too. */}
+      <div className="mt-5 xl:hidden">{actions}</div>
+
       <div className="mt-6">
         <Tabs
           active={active}
           tabs={[
-            { key: 'changes', label: 'Changes', icon: 'diff', href: urls.reviewDraft(docId) },
-            { key: 'preview', label: 'Preview', icon: 'eye', href: urls.reviewDraft(docId, 'preview') },
+            { key: 'preview', label: 'Preview', icon: 'eye', href: urls.reviewDraft(docId, undefined, list) },
+            { key: 'changes', label: 'Changes', icon: 'diff', href: urls.reviewDraft(docId, 'changes', list) },
             ...(node
-              ? [{ key: 'current', label: `Published${liveVersion ? ` v${liveVersion}` : ''}`, icon: 'file' as const, href: urls.reviewDraft(docId, 'current') }]
+              ? [{ key: 'current', label: `Published${liveVersion ? ` v${liveVersion}` : ''}`, icon: 'file' as const, href: urls.reviewDraft(docId, 'current', list) }]
               : []),
           ]}
         />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0">
           {active === 'changes' ? (
             <DiffView
@@ -165,22 +212,14 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
                 return shown.body.trim() ? (
                   <Markdown source={shown.body} links={{ vaultId, index: linkIndex }} />
                 ) : (
-                  <p className="text-center text-sm text-gray-400">No content.</p>
+                  <p className="text-center text-sm text-gray-500">No content.</p>
                 );
               })()}
             </article>
           )}
         </div>
-        <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-          <ReviewActions
-            docId={docId}
-            status={draft.status}
-            revision={draft.revision}
-            canWrite={canWrite}
-            isReviewer={viewer.isReviewer}
-            canManage={canManage}
-            staleReason={staleReason}
-          />
+        <aside className="space-y-4 xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:self-start xl:overflow-y-auto">
+          <div className="hidden xl:block">{actions}</div>
           <ActivityThread docId={docId} activity={draft.activity} canComment={canWrite} />
         </aside>
       </div>

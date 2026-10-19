@@ -1,9 +1,11 @@
 'use client';
 
+import { FIELD_TEXTAREA } from './field-styles';
 import { useEffect, useState } from 'react';
 import { Dialog } from './Dialog';
 import { buttonClass } from './button-styles';
 import type { ButtonVariant } from './button-styles';
+import { useShortcutLabel } from './useShortcutLabel';
 
 interface Props {
   open: boolean;
@@ -25,6 +27,7 @@ interface Props {
 
 /** A confirm dialog with a free-text note — used for submit, approve and request changes. */
 export function NoteDialog(props: Props) {
+  const keys = useShortcutLabel();
   const [note, setNote] = useState('');
   useEffect(() => {
     if (props.open) setNote('');
@@ -65,9 +68,9 @@ export function NoteDialog(props: Props) {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) confirm();
         }}
         placeholder={props.placeholder}
-        className="mt-1.5 block w-full rounded-lg border-0 text-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500"
+        className={`mt-1.5 ${FIELD_TEXTAREA}`}
       />
-      <p className="mt-1.5 text-xs text-gray-400">⌘ Enter to confirm</p>
+      <p className="mt-1.5 text-xs text-gray-400">{keys('⌘ Enter')} to confirm</p>
       {props.extra}
     </Dialog>
   );

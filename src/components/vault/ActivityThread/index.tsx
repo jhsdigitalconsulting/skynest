@@ -51,8 +51,8 @@ export function ActivityThread({ docId, activity, canComment }: ActivityThreadPr
               <div className="min-w-0 flex-1 text-sm">
                 <p className="text-gray-600">
                   <span className="font-medium text-gray-900">{item.actor}</span> {k.verb}
-                  {times > 1 && <span className="text-gray-400"> ({times}×)</span>}
-                  <span className="text-gray-400">
+                  {times > 1 && <span className="text-gray-500"> ({times}×)</span>}
+                  <span className="text-gray-500">
                     {' · '}
                     <RelativeTime iso={item.at} />
                   </span>

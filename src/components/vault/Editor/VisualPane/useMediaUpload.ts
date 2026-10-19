@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/core';
 import type { EditorView } from '@tiptap/pm/view';
-import { mediaFiles, uploadAsset } from '@/lib/vault-ui/upload';
+import { UploadCancelled, mediaFiles, uploadAsset } from '@/lib/vault-ui/upload';
 import { altFromName, insertAsset } from './media';
 
 /**
@@ -17,17 +17,24 @@ export function useMediaUpload(vaultId: string) {
     vaultIdRef.current = vaultId;
   }, [vaultId]);
   const editorRef = useRef<Editor | null>(null);
+  const controller = useRef<AbortController | null>(null);
+  useEffect(() => () => controller.current?.abort(), []);
 
   const uploadAll = useCallback(async (files: File[], at?: number) => {
     const editor = editorRef.current;
     if (!editor) return;
+    controller.current?.abort();
+    const current = new AbortController();
+    controller.current = current;
     for (const file of files) {
       setStatus({ busy: true, message: `Uploading ${file.name}…` });
       try {
-        const asset = await uploadAsset(vaultIdRef.current, file);
+        const asset = await uploadAsset(vaultIdRef.current, file, current.signal);
         insertAsset(editor, asset, altFromName(file.name), at);
         at = undefined;
       } catch (err) {
+        // Cancelled: whoever cancelled has already cleared the status.
+        if (err instanceof UploadCancelled) return;
         setStatus({ busy: false, message: err instanceof Error ? err.message : 'Upload failed.' });
         return;
       }
@@ -58,5 +65,11 @@ export function useMediaUpload(vaultId: string) {
     [uploadAll],
   );
 
-  return { editorRef, status, clearStatus: () => setStatus(null), handlePaste, handleDrop };
+  const cancel = useCallback(() => {
+    controller.current?.abort();
+    controller.current = null;
+    setStatus(null);
+  }, []);
+
+  return { editorRef, status, clearStatus: () => setStatus(null), cancel, handlePaste, handleDrop };
 }

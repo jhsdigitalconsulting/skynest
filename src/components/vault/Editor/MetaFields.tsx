@@ -1,6 +1,9 @@
 'use client';
 
 import type { EditorFields } from '@/lib/vault-ui/types';
+import { Icon } from '../Icon';
+import { FIELD_INPUT, FIELD_LABEL } from '../field-styles';
+import type { TagCount } from '@/lib/vault-ui/tags';
 import { PathField } from './PathField';
 import { TagInput } from './TagInput';
 
@@ -12,7 +15,12 @@ interface Props {
   folder: string;
   slug: string;
   folders: string[];
+  /** Tags already used in the vault, for the tag typeahead. */
+  tagVocabulary: TagCount[];
   disabled: boolean;
+  /** Validation messages, shown once the user has tried to save. */
+  titleError: string | null;
+  pathError: string | null;
   onTitleChange: (title: string) => void;
   onChange: <K extends keyof EditorFields>(key: K, value: EditorFields[K]) => void;
   onFolderChange: (folder: string) => void;
@@ -26,9 +34,6 @@ const TYPES = [
   { value: 'persona', label: 'Persona' },
 ];
 
-const INPUT =
-  'block w-full rounded-lg border-0 bg-white text-sm text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-500';
-
 /** Title, description, tags, type and (for new documents) location. */
 export function MetaFields(props: Props) {
   const { fields, isNew, pathLocked, disabled, onChange } = props;
@@ -40,14 +45,21 @@ export function MetaFields(props: Props) {
         disabled={disabled}
         placeholder="Untitled document"
         aria-label="Title"
+        aria-invalid={props.titleError ? true : undefined}
+        aria-describedby={props.titleError ? 'doc-title-error' : undefined}
         autoFocus={isNew && !pathLocked}
         className="block w-full border-0 bg-transparent p-0 text-2xl font-semibold tracking-tight text-gray-900 placeholder:text-gray-300 focus:outline-none focus:ring-0 disabled:text-gray-500"
       />
+      {props.titleError && (
+        <p id="doc-title-error" className="mt-1 text-sm text-rose-700">
+          {props.titleError}
+        </p>
+      )}
       {pathLocked && <p className="mt-1 font-mono text-xs text-gray-400">{props.docId}.md</p>}
 
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
+      <div className="mt-6 grid items-start gap-x-4 gap-y-5 md:grid-cols-[minmax(0,1fr)_14rem]">
         <div className="md:col-span-2">
-          <label htmlFor="doc-description" className="mb-1 block text-xs font-medium text-gray-500">
+          <label htmlFor="doc-description" className={FIELD_LABEL}>
             Description
           </label>
           <input
@@ -56,31 +68,37 @@ export function MetaFields(props: Props) {
             onChange={(e) => onChange('description', e.target.value)}
             disabled={disabled}
             placeholder="One line that tells agents and people what this is for"
-            className={INPUT}
+            className={FIELD_INPUT}
           />
         </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">Tags</label>
-          <TagInput value={fields.tags} onChange={(tags) => onChange('tags', tags)} disabled={disabled} />
+        <div className={isNew ? undefined : 'md:col-span-2'}>
+          <label className={FIELD_LABEL}>Tags</label>
+          <TagInput value={fields.tags} vocabulary={props.tagVocabulary} onChange={(tags) => onChange('tags', tags)} disabled={disabled} />
         </div>
         {isNew ? (
           <div>
-            <label htmlFor="doc-type" className="mb-1 block text-xs font-medium text-gray-500">
+            <label htmlFor="doc-type" className={FIELD_LABEL}>
               Type
             </label>
-            <select
-              id="doc-type"
-              value={fields.type}
-              onChange={(e) => onChange('type', e.target.value)}
-              disabled={disabled}
-              className={INPUT}
-            >
-              {TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                id="doc-type"
+                value={fields.type}
+                onChange={(e) => onChange('type', e.target.value)}
+                disabled={disabled}
+                className={`${FIELD_INPUT} appearance-none pr-9`}
+              >
+                {TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <Icon
+                name="chevronDown"
+                className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+              />
+            </div>
           </div>
         ) : null}
         {!pathLocked && (
@@ -91,6 +109,7 @@ export function MetaFields(props: Props) {
               folders={props.folders}
               onFolderChange={props.onFolderChange}
               onSlugChange={props.onSlugChange}
+              error={props.pathError}
             />
           </div>
         )}

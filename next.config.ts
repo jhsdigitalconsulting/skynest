@@ -2,6 +2,7 @@ import type { NextConfig } from 'next';
 
 const config: NextConfig = {
   output: 'standalone',
+  transpilePackages: ['@promptowl/contextnest-vault-ui'],
   serverExternalPackages: ['@promptowl/contextnest-engine'],
   webpack(webpackConfig) {
     // Allow .js imports to resolve .ts source files (TypeScript ESM convention)

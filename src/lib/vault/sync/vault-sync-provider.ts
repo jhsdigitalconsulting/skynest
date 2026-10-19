@@ -1,1 +1,1 @@
-export type { VaultSyncProvider } from '@/lib/vault-ui/host';
+export type { VaultSyncProvider } from '@promptowl/contextnest-vault-ui/host';

@@ -59,4 +59,4 @@ export interface ApplyOptions {
   actor: string;
 }
 
-export type { ApplyResult, PlanSummary } from '@/lib/vault-ui/git-sync-types';
+export type { ApplyResult, PlanSummary } from '@promptowl/contextnest-vault-ui/git-sync-types';

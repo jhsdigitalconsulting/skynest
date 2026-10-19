@@ -14,7 +14,7 @@ import {
   resolveGitToken,
   summarizePlan,
 } from '@/lib/vault/sync/git-pull';
-import type { GitSyncHost, HostIdentity, VaultHost } from '@/lib/vault-ui/host';
+import type { GitSyncHost, HostIdentity, VaultHost } from '@promptowl/contextnest-vault-ui/host';
 
 interface SessionShape {
   user?: { name?: string | null; email?: string | null; image?: string | null };

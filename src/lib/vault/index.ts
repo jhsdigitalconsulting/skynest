@@ -1,7 +1,7 @@
 import { NestStorage } from '@promptowl/contextnest-engine';
 import { createStorageProvider } from './storage/index.js';
 import { createVaultSyncProvider } from './sync/vault-sync-factory.js';
-import type { VaultEngine } from '@/lib/vault-ui/host';
+import type { VaultEngine } from '@promptowl/contextnest-vault-ui/host';
 
 export type { VaultEngine };
 

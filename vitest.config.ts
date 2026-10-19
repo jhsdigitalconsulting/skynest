@@ -7,9 +7,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      '@vault-ui-host': resolve(__dirname, 'src/lib/vault-host/index.ts'),
     },
   },
   test: {
     environment: 'node',
+    include: ['src/**/*.test.{ts,tsx}', 'packages/*/src/**/*.test.{ts,tsx}'],
   },
 });

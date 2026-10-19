@@ -19,8 +19,8 @@ import {
   saveDraft,
   submitDraft,
   withdrawDraft,
-} from '@/lib/review';
-import type { Draft, ReviewActor } from '@/lib/review';
+} from '@promptowl/contextnest-vault-ui/review';
+import type { Draft, ReviewActor } from '@promptowl/contextnest-vault-ui/review';
 import { NODE_TYPES } from './typed-blocks';
 import { errorResult, getExtra, jsonResult, requireWriteScope } from './tool-helpers';
 import type { ToolRegistrar } from './tool-helpers';

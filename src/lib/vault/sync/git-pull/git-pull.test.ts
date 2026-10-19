@@ -195,7 +195,7 @@ describe('after a sync (three-way)', () => {
   });
 
   it('reports drafts whose base document was just changed', async () => {
-    const { draftPath } = await import('@/lib/review/draft-store');
+    const { draftPath } = await import('@promptowl/contextnest-vault-ui/review/draft-store');
     app.set(draftPath('nodes/a'), '{}');
     git.files.set('nodes/a.md', buf('a2'));
     const { result } = await run({ mode: 'auto' });

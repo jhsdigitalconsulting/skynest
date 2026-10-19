@@ -1,0 +1,59 @@
+{
+  "name": "@promptowl/contextnest-vault-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browse, edit and review a ContextNest vault in the browser (Next.js).",
+  "exports": {
+    "./git-sync-types": "./src/lib/git-sync-types.ts",
+    "./host": "./src/lib/host.ts",
+    "./review": "./src/review/index.ts",
+    "./review/draft-store": "./src/review/draft-store.ts",
+    "./routes/[vaultId]/assets/[file]/route": "./src/routes/[vaultId]/assets/[file]/route.ts",
+    "./routes/[vaultId]/assets/route": "./src/routes/[vaultId]/assets/route.ts",
+    "./routes/[vaultId]/context/page": "./src/routes/[vaultId]/context/page.tsx",
+    "./routes/[vaultId]/doc/[...path]/page": "./src/routes/[vaultId]/doc/[...path]/page.tsx",
+    "./routes/[vaultId]/edit/[...path]/page": "./src/routes/[vaultId]/edit/[...path]/page.tsx",
+    "./routes/[vaultId]/error": "./src/routes/[vaultId]/error.tsx",
+    "./routes/[vaultId]/layout": "./src/routes/[vaultId]/layout.tsx",
+    "./routes/[vaultId]/loading": "./src/routes/[vaultId]/loading.tsx",
+    "./routes/[vaultId]/new/page": "./src/routes/[vaultId]/new/page.tsx",
+    "./routes/[vaultId]/not-found": "./src/routes/[vaultId]/not-found.tsx",
+    "./routes/[vaultId]/page": "./src/routes/[vaultId]/page.tsx",
+    "./routes/[vaultId]/review/[...path]/page": "./src/routes/[vaultId]/review/[...path]/page.tsx",
+    "./routes/[vaultId]/review/layout": "./src/routes/[vaultId]/review/layout.tsx",
+    "./routes/[vaultId]/review/page": "./src/routes/[vaultId]/review/page.tsx",
+    "./routes/[vaultId]/settings/page": "./src/routes/[vaultId]/settings/page.tsx",
+    "./routes/page": "./src/routes/page.tsx",
+    "./styles.css": "./src/styles.css"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@promptowl/contextnest-engine": "workspace:*",
+    "@tiptap/core": "3.31.4",
+    "@tiptap/extension-image": "3.31.4",
+    "@tiptap/extension-link": "3.31.4",
+    "@tiptap/extension-list": "3.31.4",
+    "@tiptap/extension-table": "3.31.4",
+    "@tiptap/extensions": "3.31.4",
+    "@tiptap/markdown": "3.31.4",
+    "@tiptap/pm": "3.31.4",
+    "@tiptap/react": "3.31.4",
+    "@tiptap/starter-kit": "3.31.4",
+    "@tiptap/suggestion": "3.31.4",
+    "diff": "^9.0.0",
+    "react-markdown": "^10.1.0",
+    "rehype-slug": "6.0.0",
+    "remark-gfm": "^4.0.1",
+    "server-only": "^0.0.1",
+    "js-yaml": "^4.2.0"
+  },
+  "peerDependencies": {
+    "next": ">=15",
+    "react": ">=19",
+    "react-dom": ">=19"
+  }
+}

@@ -64,6 +64,31 @@ describe('compactTable', () => {
   it('trims cell padding and normalizes separators', () => {
     expect(compactTable('|  a   | b |\n| :----- | ---: |')).toBe('| a | b |\n| :--- | ---: |');
   });
+  it('writes the given dashes to carry column widths', () => {
+    expect(compactTable('| a | b |\n| :--- | --- |', [10, 25])).toBe('| a | b |\n| :---------- | ------------------------- |');
+  });
+});
+
+describe('column widths', () => {
+  const TABLE = '| a | b |\n| --- | ------------------ |\n| 1 | 2 |\n';
+
+  it('loads widths from the separator row and writes an untouched table back as it was', () => {
+    const { editor, map } = open(TABLE);
+    const widths: (number[] | null)[] = [];
+    editor.state.doc.firstChild?.firstChild?.forEach((cell) => widths.push(cell.attrs.colwidth));
+    expect(widths).toEqual([[120], [180]]);
+    expect(toMarkdown(editor, map)).toBe(TABLE);
+  });
+
+  it('writes a dragged width into the separator row', () => {
+    const { editor, map } = open('| a | b |\n| --- | --- |\n| 1 | 2 |\n');
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'tableHeader' && node.textContent === 'b') {
+        editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, colwidth: [300] }));
+      }
+    });
+    expect(toMarkdown(editor, map)).toBe('| a | b |\n| ------------ | ------------------------------ |\n| 1 | 2 |\n');
+  });
 });
 
 describe('escapeText', () => {

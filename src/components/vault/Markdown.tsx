@@ -8,6 +8,7 @@ import { vaultUrls } from '@/lib/vault-ui/paths';
 import { CONTEXTNEST_SCHEME, WIKILINK_SCHEME, resolveVaultHref } from '@/lib/vault-ui/wikilinks';
 import type { LinkIndex } from '@/lib/vault-ui/wikilinks';
 import { remarkAssetVideos } from './remark-asset-videos';
+import { remarkTableWidths } from './remark-table-widths';
 import { remarkWikiLinks } from './remark-wikilinks';
 
 /** What links between documents need to resolve. */
@@ -27,7 +28,7 @@ interface Props {
 export const PROSE_CLASS =
   'prose prose-gray max-w-none [overflow-wrap:anywhere] prose-headings:scroll-mt-20 prose-headings:font-semibold prose-a:text-indigo-600 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-pre:bg-gray-900 prose-pre:text-gray-100 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-inherit prose-table:text-sm';
 
-const PLUGINS = [remarkGfm, remarkWikiLinks, remarkAssetVideos];
+const PLUGINS = [remarkGfm, remarkWikiLinks, remarkAssetVideos, remarkTableWidths];
 // Headings get ids, so `#section` links and shared URLs land on them.
 const REHYPE_PLUGINS = [rehypeSlug];
 
@@ -44,10 +45,20 @@ export function assetSrc(src: string, vaultId: string | undefined): string {
 
 function components(links: VaultLinks | undefined): Components {
   return {
-    table({ node: _node, ...rest }) {
+    table({ node: _node, children, ...rest }) {
+      const widths = (rest as { 'data-col-widths'?: string })['data-col-widths']?.split(',');
       return (
         <div className="overflow-x-auto">
-          <table {...rest} />
+          <table {...rest} className={widths ? 'w-full table-fixed' : undefined}>
+            {widths && (
+              <colgroup>
+                {widths.map((w, i) => (
+                  <col key={i} style={{ width: `${w}%` }} />
+                ))}
+              </colgroup>
+            )}
+            {children}
+          </table>
         </div>
       );
     },

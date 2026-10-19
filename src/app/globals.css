@@ -80,6 +80,19 @@ dialog.vault-dialog::backdrop {
 .visual-editor .tableWrapper {
   overflow-x: auto;
 }
+/* The draggable column border. */
+.visual-editor .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: 0;
+  width: 4px;
+  background: var(--color-indigo-500);
+  pointer-events: none;
+}
+.visual-editor.resize-cursor {
+  cursor: col-resize;
+}
 /* Links to documents in the vault get a document icon, to tell them from web links. */
 .visual-editor a[href^="contextnest://"]::before {
   content: "";

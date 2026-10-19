@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { VaultAuthError, engineFor, requireWriter } from '@/lib/vault-ui/context';
-import { AssetError, storeAsset } from '@/lib/vault/assets';
+import { AssetError, storeAsset } from '@/lib/vault-ui/asset-store';
 
 /** Upload an image or video (multipart field `file`), as ContextNest Community does. */
 export async function POST(request: Request, { params }: { params: Promise<{ vaultId: string }> }) {

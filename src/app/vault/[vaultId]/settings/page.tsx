@@ -8,7 +8,7 @@ import { loadFolders } from '@/lib/vault-ui/editor-data';
 import { vaultUrls } from '@/lib/vault-ui/paths';
 import { loadVaultConfig } from '@/lib/vault-ui/vault-config';
 import { settingsFromConfig } from '@/lib/vault-ui/vault-settings';
-import { findVault } from '@/lib/vault/registry';
+import { getVaultHost } from '@/lib/vault-ui/current-host';
 
 interface Props {
   params: Promise<{ vaultId: string }>;
@@ -41,7 +41,7 @@ export default async function SettingsPage({ params }: Props) {
       <div className="mt-5">
         <VaultSettings
           initial={settingsFromConfig(config, folders)}
-          fallbackName={findVault(vaultId)?.label ?? vaultId}
+          fallbackName={getVaultHost().vaults.find(vaultId)?.label ?? vaultId}
           docs={linkIndex.docs}
           otherYaml={otherYaml}
         />

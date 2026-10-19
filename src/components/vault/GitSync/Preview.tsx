@@ -1,4 +1,4 @@
-import type { PlanSummary } from '@/lib/vault/sync/git-pull';
+import type { PlanSummary } from '@/lib/vault-ui/git-sync-types';
 
 interface Props {
   summary: PlanSummary;

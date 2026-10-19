@@ -7,7 +7,7 @@ import {
   previewGitSyncAction,
   runGitSyncAction,
 } from '@/app/vault/git-sync-actions';
-import type { PlanSummary } from '@/lib/vault/sync/git-pull';
+import type { PlanSummary } from '@/lib/vault-ui/git-sync-types';
 import { Dialog } from '../Dialog';
 import { Icon } from '../Icon';
 import { buttonClass } from '../button-styles';

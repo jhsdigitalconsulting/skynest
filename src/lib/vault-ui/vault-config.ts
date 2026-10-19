@@ -1,7 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
 import type { NestConfig } from '@promptowl/contextnest-engine';
-import { findVault } from '@/lib/vault/registry';
+import { getVaultHost } from './current-host';
 import { engineFor, requireViewer } from './context';
 
 /** The vault's .context/config.yaml, or null when it has none or it can't be read. */
@@ -23,5 +23,5 @@ export const loadVaultConfig = cache(async (vaultId: string): Promise<NestConfig
  */
 export const loadVaultName = cache(async (vaultId: string): Promise<string> => {
   const config = await loadVaultConfig(vaultId);
-  return config?.name?.trim() || (findVault(vaultId)?.label ?? vaultId);
+  return config?.name?.trim() || (getVaultHost().vaults.find(vaultId)?.label ?? vaultId);
 });

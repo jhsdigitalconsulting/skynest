@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/vault/registry', () => ({ envForVault: (k: string) => process.env[k] }));
-vi.mock('@/lib/auth', () => ({ auth: vi.fn() }));
+vi.mock('./current-host', () => ({
+  getVaultHost: () => ({ setting: (k: string, id: string) => process.env[`${k}_${id.toUpperCase()}`] ?? process.env[k] }),
+}));
 vi.mock('./context', () => ({}));
 vi.mock('@/lib/review', () => ({ listDrafts: vi.fn() }));
 

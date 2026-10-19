@@ -1,12 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
-import { auth } from '@/lib/auth';
-import { createAuthorizationProvider } from '@/lib/authorization/authorization-factory';
-import { isMcpAuthDisabled } from '@/lib/mcp/auth';
-import { createEngine } from '@/lib/vault/index';
-import { findVault } from '@/lib/vault/registry';
-import type { VaultInfo } from '@/lib/vault/registry';
-import type { VaultEngine } from '@/lib/vault/index';
+import { getVaultHost } from './current-host';
+import type { VaultEngine, VaultInfo } from './host';
 import { isReviewRequired, isReviewer } from '@/lib/review';
 import type { ReviewActor } from '@/lib/review';
 
@@ -29,50 +24,25 @@ export type VaultSession =
   | { status: 'error'; message: string }
   | { status: 'ok'; viewer: VaultViewer };
 
-interface SessionShape {
-  user?: { name?: string | null; email?: string | null; image?: string | null };
-  idpAccessToken?: string;
-  idpLogin?: string;
-  idpGroups?: string[];
-}
-
 /**
  * Resolve who is looking at the vault UI and what they may do. Cached per
  * request so the layout and the page share one authorization round-trip.
  */
 export const getVaultSession = cache(async (): Promise<VaultSession> => {
-  const session = (await auth()) as SessionShape | null;
-  if (!session) return { status: 'signed_out' };
+  const identity = await getVaultHost().identity();
+  if (identity.status !== 'ok') return identity;
 
-  const login = session.idpLogin ?? session.user?.email ?? session.user?.name ?? 'unknown';
-  const groups = session.idpGroups;
-
-  let access: 'write' | 'read' | 'none';
-  if (isMcpAuthDisabled()) {
-    access = 'write';
-  } else {
-    if (!session.idpAccessToken) return { status: 'signed_out' };
-    try {
-      access = await createAuthorizationProvider().checkAccess({
-        idpAccessToken: session.idpAccessToken,
-        idpGroups: groups,
-      });
-    } catch (err) {
-      return { status: 'error', message: (err as Error).message };
-    }
-  }
-  if (access === 'none') return { status: 'no_access', login };
-
+  const { login, groups, access } = identity;
   return {
     status: 'ok',
     viewer: {
       login,
-      name: session.user?.name ?? null,
-      image: session.user?.image ?? null,
+      name: identity.name,
+      image: identity.image,
       access,
       isReviewer: access === 'write' && isReviewer(login, groups),
       reviewRequired: isReviewRequired(),
-      userToken: session.idpAccessToken ?? '',
+      userToken: identity.userToken,
     },
   };
 });
@@ -96,13 +66,13 @@ export async function requireWriter(): Promise<VaultViewer> {
 
 /** The registered vault for a route/action vault id, or throw — never touch an unlisted vault. */
 export function requireVault(vaultId: string): VaultInfo {
-  const vault = findVault(vaultId);
+  const vault = getVaultHost().vaults.find(vaultId);
   if (!vault) throw new VaultAuthError(`Unknown vault "${vaultId}".`);
   return vault;
 }
 
 export function engineFor(viewer: VaultViewer, vaultId: string): VaultEngine {
-  return createEngine(viewer.userToken, requireVault(vaultId).id);
+  return getVaultHost().createEngine(viewer.userToken, requireVault(vaultId).id);
 }
 
 export function actorFor(viewer: VaultViewer): ReviewActor {

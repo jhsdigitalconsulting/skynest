@@ -1,10 +1,10 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import type { StorageProvider } from '@promptowl/contextnest-engine';
-import { ASSET_NAME_RE, extensionOf, isVideoName, uploadProblem } from '@/lib/vault-ui/assets';
-import type { UploadedAsset } from '@/lib/vault-ui/assets';
-import { envForVault } from './registry';
-import type { VaultSyncProvider } from './sync/vault-sync-provider';
+import { ASSET_NAME_RE, extensionOf, isVideoName, uploadProblem } from './assets';
+import type { UploadedAsset } from './assets';
+import { getVaultHost } from './current-host';
+import type { VaultSyncProvider } from './host';
 
 export class AssetError extends Error {}
 
@@ -14,7 +14,7 @@ export class AssetError extends Error {}
  * too; it defaults to the Skynest vault id.
  */
 export function nestIdFor(vaultId: string): string {
-  return envForVault('CONTEXTNEST_NEST_ID', vaultId) ?? vaultId;
+  return getVaultHost().setting('CONTEXTNEST_NEST_ID', vaultId) ?? vaultId;
 }
 
 export function assetPath(file: string): string {

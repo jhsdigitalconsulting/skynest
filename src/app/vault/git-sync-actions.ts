@@ -3,17 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { VaultAuthError, requireVault, requireWriter } from '@/lib/vault-ui/context';
 import type { VaultViewer } from '@/lib/vault-ui/context';
-import { createStorageProvider } from '@/lib/vault/storage/index';
-import {
-  SyncBusyError,
-  applyPull,
-  getGitSource,
-  planPull,
-  readSyncState,
-  resolveGitToken,
-  summarizePlan,
-} from '@/lib/vault/sync/git-pull';
-import type { ApplyResult, PlanSummary } from '@/lib/vault/sync/git-pull';
+import { getVaultHost } from '@/lib/vault-ui/current-host';
+import type { ApplyResult, PlanSummary } from '@/lib/vault-ui/git-sync-types';
 
 export type GitSyncStatus =
   | { ok: true; configured: false }
@@ -42,17 +33,13 @@ async function requireSyncer(): Promise<VaultViewer> {
 
 function errorMessage(err: unknown): string {
   if (err instanceof VaultAuthError) return err.message;
-  if (err instanceof SyncBusyError) return 'Another sync is already running. Try again in a moment.';
+  if (getVaultHost().gitSync?.isBusyError(err)) return 'Another sync is already running. Try again in a moment.';
   return err instanceof Error ? err.message : 'Something went wrong.';
 }
 
-async function plan(viewer: VaultViewer, vaultId: string) {
-  const vault = requireVault(vaultId);
-  const source = getGitSource(vault.id);
-  if (!source) return null;
-  const storage = createStorageProvider(vault.id);
-  const token = resolveGitToken(viewer.userToken);
-  return { vault, storage, token, plan: await planPull(storage, source, token) };
+function gitSyncFor(vaultId: string) {
+  const gitSync = getVaultHost().gitSync;
+  return gitSync?.isConfigured(vaultId) ? gitSync : null;
 }
 
 /** Cheap-ish "is Git ahead?" check for the header; cached briefly per vault. */
@@ -60,15 +47,13 @@ export async function getGitSyncStatusAction(vaultId: string): Promise<GitSyncSt
   try {
     const viewer = await requireSyncer();
     const vault = requireVault(vaultId);
-    if (!getGitSource(vault.id)) return { ok: true, configured: false };
+    const gitSync = gitSyncFor(vault.id);
+    if (!gitSync) return { ok: true, configured: false };
 
     const cached = statusCache.get(vault.id);
     if (cached && Date.now() - cached.at < STATUS_TTL_MS) return cached.value;
 
-    const planned = await plan(viewer, vaultId);
-    const value: GitSyncStatus = planned
-      ? { ok: true, configured: true, summary: summarizePlan(planned.plan) }
-      : { ok: true, configured: false };
+    const value: GitSyncStatus = { ok: true, configured: true, summary: await gitSync.plan(vault.id, viewer.userToken) };
     statusCache.set(vault.id, { at: Date.now(), value });
     return value;
   } catch (err) {
@@ -80,9 +65,10 @@ export async function getGitSyncStatusAction(vaultId: string): Promise<GitSyncSt
 export async function previewGitSyncAction(vaultId: string): Promise<GitSyncPreview> {
   try {
     const viewer = await requireSyncer();
-    const planned = await plan(viewer, vaultId);
-    if (!planned) return { ok: false, error: 'This vault has no Git repository configured.' };
-    return { ok: true, summary: summarizePlan(planned.plan) };
+    const vault = requireVault(vaultId);
+    const gitSync = gitSyncFor(vault.id);
+    if (!gitSync) return { ok: false, error: 'This vault has no Git repository configured.' };
+    return { ok: true, summary: await gitSync.plan(vault.id, viewer.userToken) };
   } catch (err) {
     return { ok: false, error: errorMessage(err) };
   }
@@ -92,15 +78,12 @@ export async function previewGitSyncAction(vaultId: string): Promise<GitSyncPrev
 export async function runGitSyncAction(vaultId: string, opts: { prune: boolean }): Promise<GitSyncRun> {
   try {
     const viewer = await requireSyncer();
-    const planned = await plan(viewer, vaultId);
-    if (!planned) return { ok: false, error: 'This vault has no Git repository configured.' };
+    const vault = requireVault(vaultId);
+    const gitSync = gitSyncFor(vault.id);
+    if (!gitSync) return { ok: false, error: 'This vault has no Git repository configured.' };
 
-    const result = await applyPull(planned.storage, planned.plan, planned.token, {
-      mode: 'manual',
-      prune: opts.prune,
-      actor: viewer.login,
-    });
-    statusCache.delete(planned.vault.id);
+    const result = await gitSync.apply(vault.id, viewer.userToken, { prune: opts.prune, actor: viewer.login });
+    statusCache.delete(vault.id);
     revalidatePath('/vault', 'layout');
 
     const changed = result.added + result.updated + result.overwritten + result.removed;
@@ -118,8 +101,8 @@ export async function runGitSyncAction(vaultId: string, opts: { prune: boolean }
 export async function getLastSyncAction(vaultId: string): Promise<{ syncedAt: string; syncedBy: string } | null> {
   try {
     await requireSyncer();
-    const state = await readSyncState(createStorageProvider(requireVault(vaultId).id));
-    return state ? { syncedAt: state.syncedAt, syncedBy: state.syncedBy } : null;
+    const gitSync = getVaultHost().gitSync;
+    return gitSync ? await gitSync.lastSync(requireVault(vaultId).id) : null;
   } catch {
     return null;
   }

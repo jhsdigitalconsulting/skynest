@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { CONTENT_TYPES, extensionOf } from '@/lib/vault-ui/assets';
 import { VaultAuthError, engineFor, requireViewer } from '@/lib/vault-ui/context';
-import { AssetError, assetPath } from '@/lib/vault/assets';
+import { AssetError, assetPath } from '@/lib/vault-ui/asset-store';
 
 /** Serve a stored image or video to signed-in viewers of the vault. */
 export async function GET(_request: Request, { params }: { params: Promise<{ vaultId: string; file: string }> }) {

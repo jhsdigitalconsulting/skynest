@@ -13,7 +13,7 @@ import type {
   NestStorage,
   SuggestionMeta,
 } from '@promptowl/contextnest-engine';
-import type { VaultSyncProvider } from '@/lib/vault/sync/vault-sync-provider';
+import type { VaultSyncProvider } from '@/lib/vault-ui/host';
 import {
   deleteDraft,
   listDraftRecords,

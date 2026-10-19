@@ -2,7 +2,6 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { SignInPrompt } from '@/components/auth/SignInPrompt';
 import { GitSyncButton } from '@/components/vault/GitSync';
 import { HeaderSearch } from '@/components/vault/HeaderSearch';
 import { Toaster } from '@/components/vault/Toaster';
@@ -16,8 +15,7 @@ import { getVaultSession } from '@/lib/vault-ui/context';
 import { loadDrafts, loadLinkIndex } from '@/lib/vault-ui/data';
 import { vaultUrls } from '@/lib/vault-ui/paths';
 import { loadVaultName } from '@/lib/vault-ui/vault-config';
-import { findVault, listVaults } from '@/lib/vault/registry';
-import { getGitSource } from '@/lib/vault/sync/git-pull';
+import { getVaultHost } from '@/lib/vault-ui/current-host';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -27,7 +25,7 @@ interface LayoutProps {
 export async function generateMetadata({ params }: { params: Promise<{ vaultId: string }> }): Promise<Metadata> {
   const { vaultId } = await params;
   const id = decodeURIComponent(vaultId);
-  const label = findVault(id) ? await loadVaultName(id) : 'Vault';
+  const label = getVaultHost().vaults.find(id) ? await loadVaultName(id) : 'Vault';
   return { title: { default: `${label} · Skynest`, template: `%s · ${label} · Skynest` } };
 }
 
@@ -37,7 +35,9 @@ function Centered({ children }: { children: React.ReactNode }) {
 
 export default async function VaultLayout({ children, params }: LayoutProps) {
   const vaultId = decodeURIComponent((await params).vaultId);
-  const vault = findVault(vaultId);
+  const host = getVaultHost();
+  const { SignInPrompt } = host;
+  const vault = host.vaults.find(vaultId);
   if (!vault) notFound();
   const urls = vaultUrls(vault.id);
   const session = await getVaultSession();
@@ -73,11 +73,11 @@ export default async function VaultLayout({ children, params }: LayoutProps) {
 
   const { viewer } = session;
   const canSync =
-    viewer.access === 'write' && (!viewer.reviewRequired || viewer.isReviewer) && getGitSource(vault.id) !== null;
+    viewer.access === 'write' && (!viewer.reviewRequired || viewer.isReviewer) && host.gitSync?.isConfigured(vault.id) === true;
   const [drafts, linkIndex, vaults] = await Promise.all([
     loadDrafts(vault.id),
     loadLinkIndex(vault.id),
-    Promise.all(listVaults().map(async (v) => ({ id: v.id, label: await loadVaultName(v.id) }))),
+    Promise.all(host.vaults.list().map(async (v) => ({ id: v.id, label: await loadVaultName(v.id) }))),
   ]);
   const login = viewer.login.toLowerCase();
   const reviewCount = drafts.filter((d) => d.status === 'in_review').length;

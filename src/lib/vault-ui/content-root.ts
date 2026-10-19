@@ -1,4 +1,4 @@
-import { envForVault } from '@/lib/vault/registry';
+import { getVaultHost } from './current-host';
 
 /** Top-level folders that hold app bookkeeping rather than content; never shown in the UI. */
 const INTERNAL_PREFIXES = ['_sync/', '_drafts/'];
@@ -12,7 +12,7 @@ const DEFAULT_ROOT = 'nodes';
  * `VAULT_UI_ROOT` (or `VAULT_UI_ROOT_<VAULTID>`); set it to `/` to show everything.
  */
 export function uiRootFor(vaultId: string): string {
-  const raw = (envForVault('VAULT_UI_ROOT', vaultId) ?? DEFAULT_ROOT).trim().replace(/^\/+|\/+$/g, '');
+  const raw = (getVaultHost().setting('VAULT_UI_ROOT', vaultId) ?? DEFAULT_ROOT).trim().replace(/^\/+|\/+$/g, '');
   return raw;
 }
 

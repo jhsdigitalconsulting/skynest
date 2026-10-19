@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { StorageProvider } from '@promptowl/contextnest-engine';
-import type { VaultSyncProvider } from './sync/vault-sync-provider';
+import type { VaultSyncProvider } from './host';
 
 vi.mock('server-only', () => ({}));
-const { AssetError, assetPath, storeAsset } = await import('./assets');
+vi.mock('./current-host', () => ({
+  getVaultHost: () => ({ setting: (k: string, id: string) => process.env[`${k}_${id.toUpperCase()}`] ?? process.env[k] }),
+}));
+const { AssetError, assetPath, storeAsset } = await import('./asset-store');
 
 function setup() {
   const write = vi.fn(async () => {});

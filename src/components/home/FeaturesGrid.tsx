@@ -7,7 +7,7 @@ const features = [
   {
     title: 'Multi-user',
     description:
-      'Every team member signs in with their own GitHub account. Writes are committed with native git attribution.',
+      'Every team member signs in with their own account, and every write is attributed to the person who made it.',
   },
   {
     title: 'Git-versioned',

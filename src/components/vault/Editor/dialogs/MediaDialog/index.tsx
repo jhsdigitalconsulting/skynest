@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { FIELD_INPUT } from '../../../field-styles';
+import { useEffect, useRef, useState } from 'react';
 import type { UploadedAsset } from '@/lib/vault-ui/assets';
-import { uploadAsset } from '@/lib/vault-ui/upload';
+import { UploadCancelled, uploadAsset } from '@/lib/vault-ui/upload';
 import { Dialog } from '../../../Dialog';
 import { buttonClass } from '../../../button-styles';
 import { normalizeHref } from '../UrlLinkDialog';
@@ -18,8 +19,7 @@ export interface MediaDialogProps {
   onUploaded: (asset: UploadedAsset, alt: string) => void;
 }
 
-const INPUT_CLASS =
-  'mt-1 h-10 w-full rounded-lg border-0 px-3 text-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-500';
+const INPUT_CLASS = `mt-1 ${FIELD_INPUT}`;
 
 /** Upload an image or video into the vault, or embed an image from a URL. */
 export function MediaDialog({ vaultId, onClose, onInsertUrl, onUploaded }: MediaDialogProps) {
@@ -27,16 +27,29 @@ export function MediaDialog({ vaultId, onClose, onInsertUrl, onUploaded }: Media
   const [alt, setAlt] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const controller = useRef<AbortController | null>(null);
+
+  // Closing the dialog abandons an upload still in flight.
+  useEffect(() => () => controller.current?.abort(), []);
 
   const upload = async (file: File) => {
+    const current = new AbortController();
+    controller.current = current;
     setBusy(true);
     setError(null);
     try {
-      onUploaded(await uploadAsset(vaultId, file), alt.trim());
+      onUploaded(await uploadAsset(vaultId, file, current.signal), alt.trim());
     } catch (err) {
+      if (err instanceof UploadCancelled) return;
       setError(err instanceof Error ? err.message : 'Upload failed.');
       setBusy(false);
     }
+  };
+
+  const cancelUpload = () => {
+    controller.current?.abort();
+    controller.current = null;
+    setBusy(false);
   };
 
   const submit = (e: React.FormEvent) => {
@@ -53,8 +66,8 @@ export function MediaDialog({ vaultId, onClose, onInsertUrl, onUploaded }: Media
       description="Uploads are saved in the vault's assets folder, where ContextNest Community finds them too."
       footer={
         <>
-          <button type="button" onClick={onClose} className={buttonClass('secondary')}>
-            Cancel
+          <button type="button" onClick={busy ? cancelUpload : onClose} className={buttonClass('secondary')}>
+            {busy ? 'Cancel upload' : 'Cancel'}
           </button>
           <button type="submit" form="media-form" disabled={!src.trim() || busy} className={buttonClass('primary')}>
             Embed URL

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { DocList } from '@/components/vault/DocList';
 import { EmptyState } from '@/components/vault/EmptyState';
+import { FolderActionsProvider, NewFolderButton } from '@/components/vault/FolderActions';
 import { FolderTree } from '@/components/vault/FolderTree';
 import { Icon } from '@/components/vault/Icon';
 import { TypeFilter } from '@/components/vault/TypeFilter';
@@ -17,7 +18,9 @@ import {
   searchNodes,
   toListItem,
 } from '@/lib/vault-ui/data';
+import { flattenFolders } from '@/lib/vault-ui/folder-path';
 import { vaultUrls } from '@/lib/vault-ui/paths';
+import { loadVaultConfig } from '@/lib/vault-ui/vault-config';
 
 interface Props {
   params: Promise<{ vaultId: string }>;
@@ -28,7 +31,12 @@ export default async function BrowsePage({ params, searchParams }: Props) {
   const { vaultId } = await params;
   const urls = vaultUrls(vaultId);
   const { folder = '', q = '', type } = await searchParams;
-  const [viewer, allNodes, drafts] = await Promise.all([requireViewer(), loadNodes(vaultId), loadDrafts(vaultId)]);
+  const [viewer, allNodes, drafts, config] = await Promise.all([
+    requireViewer(),
+    loadNodes(vaultId),
+    loadDrafts(vaultId),
+    loadVaultConfig(vaultId),
+  ]);
   const nodes = visibleNodes(allNodes, uiRootFor(vaultId));
   const root = effectiveRoot(nodes, uiRootFor(vaultId));
   const draftByDoc = new Map(drafts.map((d) => [d.docId, d]));
@@ -53,13 +61,16 @@ export default async function BrowsePage({ params, searchParams }: Props) {
   const crumbs = folder ? folder.split('/') : [];
   const hiddenCrumbs = root && folder.startsWith(root) ? root.split('/').length : 0;
   const canWrite = viewer.access === 'write';
+  const existingFolders = flattenFolders(tree);
+  const folderDescription = !query && folder ? config?.folders?.[folder]?.description : undefined;
 
   return (
+    <FolderActionsProvider rootPath={tree.path} existingFolders={existingFolders}>
     <div className={`${PAGE_CONTAINER} flex gap-8 py-6`}>
       <aside className="hidden w-60 shrink-0 lg:block">
         <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-1">
-          <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Folders</p>
-          <FolderTree root={tree} activeFolder={folder} />
+          <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Folders</p>
+          <FolderTree root={tree} activeFolder={folder} canWrite={canWrite} />
         </div>
       </aside>
 
@@ -96,14 +107,32 @@ export default async function BrowsePage({ params, searchParams }: Props) {
               {items.length} {items.length === 1 ? 'document' : 'documents'}
               {query && folder ? ` in ${folder}` : ''}
             </p>
+            {folderDescription && <p className="mt-2 max-w-2xl text-sm text-gray-600">{folderDescription}</p>}
           </div>
           {canWrite && (
-            <Link href={urls.newDoc(folder || undefined)} className={buttonClass('secondary')}>
-              <Icon name="plus" />
-              New document{folder ? ' here' : ''}
-            </Link>
+            <div className="flex gap-2">
+              <NewFolderButton parent={folder || tree.path} />
+              <Link href={urls.newDoc(folder || undefined)} className={buttonClass('secondary')}>
+                <Icon name="plus" />
+                New document{folder ? ' here' : ''}
+              </Link>
+            </div>
           )}
         </div>
+
+        {/* The sidebar tree is desktop-only; smaller screens get it behind a disclosure. */}
+        {tree.children.length > 0 && (
+          <details className="mb-4 rounded-xl bg-white shadow-sm ring-1 ring-gray-200 lg:hidden">
+            <summary className="flex h-10 cursor-pointer items-center gap-2 px-3 text-sm font-medium text-gray-700">
+              <Icon name="folder" className="h-4 w-4 text-gray-500" />
+              Folders
+              <span className="ml-auto truncate text-xs font-normal text-gray-500">{crumbs.at(-1) ?? 'All documents'}</span>
+            </summary>
+            <div className="border-t border-gray-100 p-2">
+              <FolderTree root={tree} activeFolder={folder} canWrite={canWrite} />
+            </div>
+          </details>
+        )}
 
         <div className="mb-4">
           <TypeFilter vaultId={vaultId} types={types} active={type ?? null} folder={folder || undefined} q={query || undefined} />
@@ -141,5 +170,6 @@ export default async function BrowsePage({ params, searchParams }: Props) {
         )}
       </main>
     </div>
+    </FolderActionsProvider>
   );
 }

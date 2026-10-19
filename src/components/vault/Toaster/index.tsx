@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icon';
+import { FOCUS_RING } from '../button-styles';
 import { ToastContext } from './context';
 import type { Toast, ToastTone } from './context';
 
@@ -15,20 +16,60 @@ interface Props {
   children: React.ReactNode;
 }
 
+interface Timer {
+  handle: ReturnType<typeof setTimeout> | null;
+  remaining: number;
+  startedAt: number;
+}
+
 export function Toaster({ children }: Props) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(1);
+  const timers = useRef(new Map<number, Timer>());
+  const paused = useRef(false);
 
-  const dismiss = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), []);
+  const dismiss = useCallback((id: number) => {
+    const timer = timers.current.get(id);
+    if (timer?.handle) clearTimeout(timer.handle);
+    timers.current.delete(id);
+    setToasts((t) => t.filter((x) => x.id !== id));
+  }, []);
+
+  const start = useCallback(
+    (id: number, timer: Timer) => {
+      timer.startedAt = Date.now();
+      timer.handle = setTimeout(() => dismiss(id), timer.remaining);
+    },
+    [dismiss],
+  );
 
   const show = useCallback(
     (message: string, tone: ToastTone = 'success') => {
       const id = nextId.current++;
       setToasts((t) => [...t.slice(-3), { id, tone, message }]);
-      setTimeout(() => dismiss(id), tone === 'error' ? 8000 : 4000);
+      const timer: Timer = { handle: null, remaining: tone === 'error' ? 8000 : 4000, startedAt: 0 };
+      timers.current.set(id, timer);
+      if (!paused.current) start(id, timer);
     },
-    [dismiss],
+    [start],
   );
+
+  // Hovering or focusing a toast holds every toast on screen, so there's time to read it.
+  const pause = () => {
+    if (paused.current) return;
+    paused.current = true;
+    for (const timer of timers.current.values()) {
+      if (!timer.handle) continue;
+      clearTimeout(timer.handle);
+      timer.handle = null;
+      timer.remaining = Math.max(1000, timer.remaining - (Date.now() - timer.startedAt));
+    }
+  };
+  const resume = () => {
+    if (!paused.current) return;
+    paused.current = false;
+    for (const [id, timer] of timers.current) if (!timer.handle) start(id, timer);
+  };
 
   const api = useMemo(() => ({ show }), [show]);
 
@@ -37,6 +78,10 @@ export function Toaster({ children }: Props) {
       {children}
       <div
         aria-live="polite"
+        onMouseEnter={pause}
+        onMouseLeave={resume}
+        onFocus={pause}
+        onBlur={resume}
         className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-2 p-4 sm:items-end"
       >
         {toasts.map((t) => (
@@ -50,7 +95,7 @@ export function Toaster({ children }: Props) {
             <button
               type="button"
               onClick={() => dismiss(t.id)}
-              className="text-gray-400 hover:text-gray-600"
+              className={`rounded text-gray-500 hover:text-gray-700 ${FOCUS_RING}`}
               aria-label="Dismiss"
             >
               <Icon name="x" className="h-4 w-4" />

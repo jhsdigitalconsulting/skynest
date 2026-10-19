@@ -17,23 +17,27 @@ function format(iso: string, now: number): string {
 }
 
 /**
- * "3h ago", refreshed each minute. The server renders an absolute date and the
- * client swaps in the relative form after mount, so there's no hydration mismatch.
+ * "3h ago", refreshed each minute. The server renders the relative form from its
+ * own clock, so the text is already right on first paint; the client takes over
+ * after mount. The two clocks can disagree by a minute at a boundary, hence
+ * suppressHydrationWarning on just this element.
  */
 export function RelativeTime({ iso, className }: { iso: string | null | undefined; className?: string }) {
-  const [now, setNow] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [title, setTitle] = useState<string | undefined>(undefined);
   useEffect(() => {
     setNow(Date.now());
+    // Full date in the viewer's own locale and time zone, for the hover tooltip.
+    if (iso) setTitle(new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }));
     const t = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(t);
-  }, []);
+  }, [iso]);
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  const absolute = date.toISOString().slice(0, 10);
   return (
-    <time dateTime={iso} title={date.toUTCString()} className={className}>
-      {now === null ? absolute : format(iso, now)}
+    <time dateTime={iso} title={title} className={className} suppressHydrationWarning>
+      {format(iso, now)}
     </time>
   );
 }

@@ -99,11 +99,14 @@ export function link(): Command {
   };
 }
 
-/** Link the selection (or `label` when nothing is selected) to `href`, leaving the cursor after it. */
-export function linkTo(href: string, label: string): Command {
+/**
+ * Link `text` (or the selection, or `label` when nothing is selected) to `href`,
+ * leaving the cursor after it.
+ */
+export function linkTo(href: string, label: string, text?: string): Command {
   return ({ value, start, end }) => {
-    const text = `[${value.slice(start, end) || label}](${href})`;
-    return { from: start, to: end, text, selStart: start + text.length, selEnd: start + text.length };
+    const linkText = `[${text || value.slice(start, end) || label}](${href})`;
+    return { from: start, to: end, text: linkText, selStart: start + linkText.length, selEnd: start + linkText.length };
   };
 }
 

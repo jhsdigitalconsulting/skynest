@@ -3,11 +3,23 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
+import { TextSelection } from '@tiptap/pm/state';
 import { vaultUrls } from '@/lib/vault-ui/paths';
-import { resolveVaultHref } from '@/lib/vault-ui/wikilinks';
+import { contextnestHref, resolveVaultHref } from '@/lib/vault-ui/wikilinks';
+import type { LinkTarget } from '@/lib/vault-ui/wikilinks';
+import { titleOf } from '../dialogs/DocLinkDialog/search';
 import { PROSE_CLASS, assetSrc } from '../../Markdown';
 import type { VaultLinks } from '../../Markdown';
 import { applyGentleEscaping, visualExtensions } from './extensions';
+import { docSlash } from './doc-slash';
+import type { DocSlashBridge, DocSlashState } from './doc-slash';
+import { DocSlashMenu } from './DocSlashMenu';
+import type { DocSlashMenuHandle } from './DocSlashMenu';
+import { LinkContextMenu } from './LinkContextMenu';
+import type { LinkMenuState } from './LinkContextMenu';
+import { TableContextMenu } from './TableContextMenu';
+import type { TableMenuState } from './TableContextMenu';
+import { removeLink } from './linking';
 import { loadMarkdown, toMarkdown } from './markdown-sync';
 import type { SourceMap } from './markdown-sync';
 import { VisualDialogs } from './VisualDialogs';
@@ -40,6 +52,8 @@ function linkDestination(href: string, links: VaultLinks): string | null {
  */
 export function VisualPane({ value, onChange, disabled, controls, links }: VisualPaneProps) {
   const [dialog, setDialog] = useState<VisualDialog | null>(null);
+  const [linkMenu, setLinkMenu] = useState<LinkMenuState | null>(null);
+  const [tableMenu, setTableMenu] = useState<TableMenuState | null>(null);
   const linksRef = useRef(links);
   useEffect(() => {
     linksRef.current = links;
@@ -54,11 +68,26 @@ export function VisualPane({ value, onChange, disabled, controls, links }: Visua
 
   const media = useMediaUpload(links.vaultId);
 
+  // The `/` document search: the extension reports what's typed, the menu handles the keys.
+  const [slash, setSlash] = useState<DocSlashState | null>(null);
+  const slashMenu = useRef<DocSlashMenuHandle>(null);
+  const slashBridge = useRef<DocSlashBridge | null>(null);
+  slashBridge.current = {
+    onChange: setSlash,
+    onKeyDown: (event) => slashMenu.current?.onKeyDown(event) ?? false,
+  };
+
   const editor = useEditor({
-    extensions: visualExtensions('Start writing…', (src) => assetSrc(src, linksRef.current.vaultId)),
+    extensions: [
+      ...visualExtensions('Start writing… Type / to link a document.', (src) => assetSrc(src, linksRef.current.vaultId)),
+      docSlash(slashBridge),
+    ],
     immediatelyRender: false,
     editable: !disabled,
     editorProps: {
+      // Keep the cursor clear of the sticky header + toolbar above and the action bar below.
+      scrollMargin: { top: 128, bottom: 96, left: 0, right: 0 },
+      scrollThreshold: { top: 128, bottom: 96, left: 0, right: 0 },
       attributes: {
         class: `${PROSE_CLASS} visual-editor min-h-[480px] px-6 py-5 sm:px-8 focus:outline-none`,
         'aria-label': 'Document body',
@@ -74,6 +103,22 @@ export function VisualPane({ value, onChange, disabled, controls, links }: Visua
           return true;
         }
         return false;
+      },
+      handleDOMEvents: {
+        // Right-clicking a link or a table cell opens our menu; elsewhere the browser's own menu stays.
+        contextmenu: (view, event) => {
+          const target = event.target as HTMLElement;
+          const href = target.closest('a')?.getAttribute('href');
+          const inTable = !!target.closest('td, th');
+          if ((!href && !inTable) || !view.editable) return false;
+          const at = view.posAtCoords({ left: event.clientX, top: event.clientY });
+          if (at) view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at.pos)));
+          event.preventDefault();
+          const where = { x: event.clientX, y: event.clientY };
+          if (href) setLinkMenu({ ...where, href });
+          else setTableMenu(where);
+          return true;
+        },
       },
       // Links don't navigate while editing; ⌘/Ctrl-click opens them in a new tab.
       handleClick: (_view, _pos, event) => {
@@ -108,18 +153,56 @@ export function VisualPane({ value, onChange, disabled, controls, links }: Visua
     media.editorRef.current = editor;
   }, [editor, media.editorRef]);
 
+  const pickSlash = (doc: LinkTarget) => {
+    if (!editor || !slash) return;
+    const href = contextnestHref(doc.id);
+    editor
+      .chain()
+      .focus()
+      .deleteRange(slash.range)
+      .insertContent([
+        { type: 'text', text: titleOf(doc), marks: [{ type: 'link', attrs: { href } }] },
+        { type: 'text', text: ' ' },
+      ])
+      .run();
+  };
+
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
-      <div className="sticky top-14 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white/95 px-2 py-1.5 backdrop-blur">
-        <VisualToolbar editor={editor} disabled={disabled} onOpenDialog={setDialog} />
-        {controls}
+    <div className="overflow-clip rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
+      {/* Upload progress rides with the sticky toolbar so it stays visible while scrolled down the page. */}
+      <div className="sticky top-14 z-10 border-b border-gray-200 bg-white/95 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-2 py-1.5">
+          <VisualToolbar editor={editor} disabled={disabled} onOpenDialog={setDialog} />
+          {controls}
+        </div>
+        <UploadStatus status={media.status} onDismiss={media.clearStatus} onCancel={media.cancel} />
       </div>
-      <UploadStatus status={media.status} onDismiss={media.clearStatus} />
       {editor ? (
         <EditorContent editor={editor} />
       ) : (
         <div className="min-h-[480px] px-6 py-5 text-sm text-gray-400 sm:px-8">Loading editor…</div>
       )}
+      {editor && slash && <DocSlashMenu ref={slashMenu} state={slash} docs={links.index.docs} onPick={pickSlash} />}
+      {editor && linkMenu && (
+        <LinkContextMenu
+          state={linkMenu}
+          onClose={() => setLinkMenu(null)}
+          onEdit={() => {
+            setLinkMenu(null);
+            setDialog('url');
+          }}
+          onOpen={() => {
+            setLinkMenu(null);
+            const url = linkDestination(linkMenu.href, linksRef.current);
+            if (url) window.open(url, '_blank', 'noopener,noreferrer');
+          }}
+          onRemove={() => {
+            setLinkMenu(null);
+            removeLink(editor);
+          }}
+        />
+      )}
+      {editor && tableMenu && <TableContextMenu editor={editor} state={tableMenu} onClose={() => setTableMenu(null)} />}
       {editor && dialog && (
         <VisualDialogs editor={editor} dialog={dialog} docs={links.index.docs} vaultId={links.vaultId} onClose={() => setDialog(null)} />
       )}

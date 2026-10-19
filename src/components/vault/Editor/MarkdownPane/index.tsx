@@ -11,6 +11,7 @@ import { applyEdit } from './applyEdit';
 import { SHORTCUTS, Toolbar } from '../Toolbar';
 import { ModeSwitch } from '../ModeSwitch';
 import type { EditorMode } from '../ModeSwitch';
+import { useShortcutLabel } from '../../useShortcutLabel';
 
 export interface MarkdownPaneProps {
   value: string;
@@ -23,15 +24,24 @@ export interface MarkdownPaneProps {
 }
 
 export function MarkdownPane({ value, onChange, mode, onModeChange, disabled, links }: MarkdownPaneProps) {
+  const keys = useShortcutLabel();
   const ref = useRef<HTMLTextAreaElement>(null);
-  const [picking, setPicking] = useState(false);
+  // The selected text when the document picker opened; null while it's closed.
+  const [picking, setPicking] = useState<string | null>(null);
+  const openPicker = () => {
+    const el = ref.current;
+    setPicking(el ? el.value.slice(el.selectionStart, el.selectionEnd) : '');
+  };
 
   // Grow with the content so the page, not the textarea, scrolls.
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // Collapsing to 'auto' to measure briefly shortens the page; keep the scroll position so it doesn't jump.
+    const y = window.scrollY;
     el.style.height = 'auto';
     el.style.height = `${Math.max(el.scrollHeight, 480)}px`;
+    if (window.scrollY !== y) window.scrollTo(0, y);
   }, [value, mode]);
 
   const run = useCallback(
@@ -48,7 +58,7 @@ export function MarkdownPane({ value, onChange, mode, onModeChange, disabled, li
     const el = e.currentTarget;
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
       e.preventDefault();
-      setPicking(true);
+      openPicker();
       return;
     }
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
@@ -72,13 +82,13 @@ export function MarkdownPane({ value, onChange, mode, onModeChange, disabled, li
   const showPreview = mode !== 'write';
 
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
+    <div className="overflow-clip rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
       <div className="sticky top-14 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white/95 px-2 py-1.5 backdrop-blur">
-        <Toolbar onCommand={run} onDocLink={() => setPicking(true)} disabled={disabled || mode === 'preview'} />
+        <Toolbar onCommand={run} onDocLink={openPicker} disabled={disabled || mode === 'preview'} />
         <ModeSwitch mode={mode} onChange={onModeChange} />
       </div>
-      <div className={mode === 'split' ? 'grid lg:grid-cols-2 lg:divide-x lg:divide-gray-200' : ''}>
-        <div className={showEditor ? '' : 'hidden'}>
+      <div className={mode === 'split' ? 'grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:divide-x lg:divide-gray-200' : ''}>
+        <div className={showEditor ? 'min-w-0' : 'hidden'}>
           <textarea
             ref={ref}
             value={value}
@@ -87,26 +97,28 @@ export function MarkdownPane({ value, onChange, mode, onModeChange, disabled, li
             disabled={disabled}
             spellCheck
             aria-label="Document body (markdown)"
-            placeholder="Write in markdown…  Use the toolbar or ⌘B / ⌘I / ⌘K for formatting."
+            placeholder={keys('Write in markdown…  Use the toolbar or ⌘B / ⌘I / ⌘K for formatting.')}
             className="editor-textarea block w-full resize-none border-0 bg-transparent px-6 py-5 font-mono text-[14px] leading-7 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-0"
           />
         </div>
         {showPreview && (
-          <div className="min-h-[480px] px-6 py-5 sm:px-8">
-            {value.trim() ? <Markdown source={value} links={links} /> : <p className="text-sm text-gray-400">Nothing to preview yet.</p>}
+          <div className="min-h-[480px] min-w-0 px-6 py-5 sm:px-8">
+            {value.trim() ? <Markdown source={value} links={links} /> : <p className="text-sm text-gray-500">Nothing to preview yet.</p>}
           </div>
         )}
       </div>
-      {picking && (
+      {picking !== null && (
         <DocLinkDialog
           docs={links.index.docs}
+          initialText={picking}
+          editing={false}
           onClose={() => {
-            setPicking(false);
+            setPicking(null);
             ref.current?.focus();
           }}
-          onPick={(doc) => {
-            setPicking(false);
-            run(linkTo(contextnestHref(doc.id), titleOf(doc)));
+          onPick={(doc, text) => {
+            setPicking(null);
+            run(linkTo(contextnestHref(doc.id), titleOf(doc), text));
           }}
         />
       )}

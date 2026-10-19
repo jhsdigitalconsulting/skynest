@@ -1,5 +1,7 @@
 # Skynest
 
+> Orlando Health MarTech deployment. Hosted at [ctx.ohmartech.com](https://ctx.ohmartech.com).
+
 **Your team's knowledge, always available.**
 
 Skynest brings [Context Nest](https://github.com/PromptOwl/ContextNest) to the cloud — a hosted MCP server your whole team can connect to from any AI tool, anywhere, without running anything locally.
@@ -7,6 +9,7 @@ Skynest brings [Context Nest](https://github.com/PromptOwl/ContextNest) to the c
 ---
 
 ## What is Skynest?
+
 
 ### Built on Context Nest
 
@@ -117,7 +120,7 @@ This outputs `OAUTH_JWT_PRIVATE_KEY` and `OAUTH_JWT_PUBLIC_KEY` values for your 
 
 ### 4. Deploy to Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jhs129/skynest)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jhsdigitalconsulting/skynest)
 
 > If you're deploying from a fork, update the `repository-url` query param above to point at your own org/repo before sharing this button.
 

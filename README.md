@@ -373,6 +373,22 @@ When a meeting ends, read.ai POSTs the transcript to Skynest, which:
 
 ---
 
+## Vault UI
+
+The web UI for browsing, editing and reviewing a vault lives in its own workspace package, [`packages/vault-ui`](packages/vault-ui/README.md), and Skynest mounts it at `/vault`. The package has no Skynest-specific imports: Skynest supplies auth, storage, the vault list and Git sync through a `VaultHost` implementation in `src/lib/vault-host`, joined by the `@vault-ui-host` alias. To configure it or mount it in another app, see the [package README](packages/vault-ui/README.md).
+
+Per-vault UI settings you can put in the Skynest environment:
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `CONTEXTNEST_VAULTS` | single default vault | Vaults to serve, as `id:Label,id:Label` |
+| `CONTEXTNEST_DEFAULT_VAULT_ID` | `default` | The vault `/vault` opens |
+| `VAULT_UI_ROOT` (or `VAULT_UI_ROOT_<VAULT_ID>`) | `nodes` | Content folder the UI treats as its root |
+| `CONTEXTNEST_REQUIRE_REVIEW` | `false` | Send non-reviewers' edits to the review queue |
+| `AUTHZ_REVIEWERS` | every writer | Comma-separated logins who can approve drafts |
+
+---
+
 ## Local development
 
 ```bash
@@ -422,6 +438,7 @@ skynest/
 │       │   ├── storage/                              # BlobStorageProvider + factory
 │       │   └── sync/                                 # GitVaultSyncProvider + GitHub impl
 │       └── webhooks/readai/                          # read.ai payload schema, verify, dedup, analyze, document
+├── packages/vault-ui/                                # Vault UI package (components, review, routes)
 ├── vendor/                                           # Vendored Context Nest engine (fork of PromptOwl/ContextNest)
 ├── scripts/                                          # init-vault.sh, oauth-gen-keypair.ts
 ├── vercel.json

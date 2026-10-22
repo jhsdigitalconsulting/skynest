@@ -1,5 +1,5 @@
 import type { StorageProvider } from '@promptowl/contextnest-engine';
-import { draftPath } from '@/lib/review/draft-store';
+import { draftPath } from '@promptowl/contextnest-vault-ui/review/draft-store';
 import { fetchBlob } from './github-api';
 import { SYNC_DIR, acquireLock, appFileSha, mapPool, writeSyncState } from './state';
 import type { ApplyOptions, ApplyResult, PullEntry, PullPlan } from './types';

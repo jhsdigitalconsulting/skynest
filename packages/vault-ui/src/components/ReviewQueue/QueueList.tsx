@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { approveAction, bulkApproveAction } from '../../routes/actions';
 import type { PendingSuggestion } from '../../review';
+import { NO_FILTERS, activeFilterCount, applyQueueFilters, queueFacets } from '../../lib/queue-filter';
+import type { QueueFilters } from '../../lib/queue-filter';
 import { QUEUE_TABS } from '../../lib/review-queue';
 import type { QueueGroups, QueueItem, QueueTab } from '../../lib/review-queue';
 import { EmptyState } from '../EmptyState';
@@ -17,6 +19,7 @@ import { useVaultAction } from '../useVaultAction';
 import { useVaultId, useVaultUrls } from '../useVault';
 import { BulkBar } from './BulkBar';
 import { QueueRow } from './QueueRow';
+import { QueueToolbar } from './QueueToolbar';
 
 export type QueueSuggestion = Pick<PendingSuggestion, 'suggestion_id' | 'document_id' | 'title' | 'detected_at'>;
 
@@ -57,7 +60,12 @@ export function QueueList({ groups, suggestions, tab, activeDocId, viewTab, canW
   const router = useRouter();
   const { run, pending } = useVaultAction();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const items = groups[tab];
+  const [filters, setFilters] = useState<QueueFilters>(NO_FILTERS);
+  const allItems = groups[tab];
+  const facets = useMemo(() => queueFacets(allItems), [allItems]);
+  // Date ranges are measured from when the list was last recomputed, which is good enough for "last 7 days".
+  const items = useMemo(() => applyQueueFilters(allItems, filters, Date.now()), [allItems, filters]);
+  const filtered = activeFilterCount(filters) > 0;
   const bulk = isReviewer && canWrite && tab === 'review';
 
   // Drop selections for items that have been approved or changed status.
@@ -139,6 +147,15 @@ export function QueueList({ groups, suggestions, tab, activeDocId, viewTab, canW
         })}
       </nav>
 
+      <QueueToolbar
+        filters={filters}
+        onChange={setFilters}
+        tags={facets.tags}
+        authors={facets.authors}
+        shown={items.length}
+        total={allItems.length}
+      />
+
       {bulk && eligible.length > 0 && (
         <label className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 text-xs text-gray-600">
           <input
@@ -175,6 +192,15 @@ export function QueueList({ groups, suggestions, tab, activeDocId, viewTab, canW
               />
             ))}
           </ul>
+        ) : filtered && allItems.length > 0 ? (
+          <div className="p-4">
+            <EmptyState icon="search" title="No matches">
+              Nothing in this list fits your search and filters.{' '}
+              <button type="button" onClick={() => setFilters({ ...NO_FILTERS, sort: filters.sort })} className="font-medium text-indigo-600 hover:underline">
+                Clear filters
+              </button>
+            </EmptyState>
+          </div>
         ) : (
           <div className="p-4">
             <EmptyState icon={EMPTY[tab].icon} title={EMPTY[tab].title}>

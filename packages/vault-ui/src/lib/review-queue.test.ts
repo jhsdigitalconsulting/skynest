@@ -9,6 +9,7 @@ function draft(docId: string, over: Partial<DraftSummary> = {}): DraftSummary {
     baseVersion: 1,
     status: 'in_review',
     title: docId,
+    tags: [],
     author: 'alice',
     contributors: ['alice'],
     revision: 1,

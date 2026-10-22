@@ -1,3 +1,4 @@
+import { parseDocument } from '@promptowl/contextnest-engine';
 import type { StorageProvider } from '@promptowl/contextnest-engine';
 import type { Draft, DraftSummary } from './types';
 
@@ -65,6 +66,15 @@ export async function listDraftRecords(provider: StorageProvider): Promise<Draft
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+/** Tags from the draft's frontmatter; an unparseable draft simply has none. */
+function draftTags(draft: Draft): string[] {
+  try {
+    return parseDocument(`${draft.docId}.md`, draft.content, draft.docId).frontmatter.tags ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export function summarizeDraft(draft: Draft): DraftSummary {
   return {
     docId: draft.docId,
@@ -72,6 +82,7 @@ export function summarizeDraft(draft: Draft): DraftSummary {
     baseVersion: draft.baseVersion,
     status: draft.status,
     title: draft.title,
+    tags: draftTags(draft),
     author: draft.author,
     contributors: draft.contributors,
     revision: draft.revision,

@@ -69,6 +69,8 @@ export interface DraftSummary {
   baseVersion: number | null;
   status: DraftStatus;
   title: string;
+  /** Tags from the draft's frontmatter. */
+  tags: string[];
   author: string;
   contributors: string[];
   revision: number;

@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { approveAction, bulkApproveAction } from '../../routes/actions';
 import type { PendingSuggestion } from '../../review';
+import { NO_FILTERS, activeFilterCount, applyQueueFilters, queueFacets } from '../../lib/queue-filter';
+import type { QueueFilters } from '../../lib/queue-filter';
 import { QUEUE_TABS } from '../../lib/review-queue';
 import type { QueueGroups, QueueItem, QueueTab } from '../../lib/review-queue';
 import { EmptyState } from '../EmptyState';
@@ -13,10 +15,12 @@ import type { IconName } from '../Icon';
 import { RelativeTime } from '../RelativeTime';
 import { SuggestionActions } from '../SuggestionActions';
 import { FOCUS_RING } from '../button-styles';
+import { publishQueueOrder } from '../useQueueOrder';
 import { useVaultAction } from '../useVaultAction';
 import { useVaultId, useVaultUrls } from '../useVault';
 import { BulkBar } from './BulkBar';
 import { QueueRow } from './QueueRow';
+import { QueueToolbar } from './QueueToolbar';
 
 export type QueueSuggestion = Pick<PendingSuggestion, 'suggestion_id' | 'document_id' | 'title' | 'detected_at'>;
 
@@ -57,7 +61,12 @@ export function QueueList({ groups, suggestions, tab, activeDocId, viewTab, canW
   const router = useRouter();
   const { run, pending } = useVaultAction();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const items = groups[tab];
+  const [filters, setFilters] = useState<QueueFilters>(NO_FILTERS);
+  const allItems = groups[tab];
+  const facets = useMemo(() => queueFacets(allItems), [allItems]);
+  // Date ranges are measured from when the list was last recomputed, which is good enough for "last 7 days".
+  const items = useMemo(() => applyQueueFilters(allItems, filters, Date.now()), [allItems, filters]);
+  const filtered = activeFilterCount(filters) > 0;
   const bulk = isReviewer && canWrite && tab === 'review';
 
   // Drop selections for items that have been approved or changed status.
@@ -72,23 +81,57 @@ export function QueueList({ groups, suggestions, tab, activeDocId, viewTab, canW
       return next;
     });
 
-  // j / k step through the list, like a mail client.
+  const listRef = useRef<HTMLDivElement>(null);
+  const rowFor = (docId: string) => listRef.current?.querySelector<HTMLElement>(`[data-docid="${CSS.escape(docId)}"]`) ?? null;
+
+  // Tell the draft pane what order the list is in, so its Previous / Next links match.
+  useEffect(() => {
+    publishQueueOrder({ tab, ids: items.map((i) => i.docId) });
+  }, [items, tab]);
+
+  // Where the last key press landed. The URL (and so activeDocId) lags a beat behind, and a second press
+  // arriving before it catches up must continue from here, not from the stale open item.
+  const cursor = useRef<string | null>(activeDocId);
+  useEffect(() => {
+    cursor.current = activeDocId;
+    // Keep the open row visible however it got selected (keys, links, or the pane's Previous / Next).
+    if (activeDocId) rowFor(activeDocId)?.scrollIntoView({ block: 'nearest' });
+  }, [activeDocId]);
+
+  // Open the item `delta` rows from the cursor. With nothing open yet, j / ↓ opens the first.
+  const step = (delta: 1 | -1, from: string | null = cursor.current) => {
+    const at = items.findIndex((i) => i.docId === from);
+    const next = items[at === -1 ? 0 : Math.min(Math.max(at + delta, 0), items.length - 1)];
+    if (!next || next.docId === from) return null;
+    cursor.current = next.docId;
+    router.push(hrefFor(next), { scroll: false });
+    return next;
+  };
+
+  // j / k step through the list from anywhere on the page, like a mail client.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || (e.key !== 'j' && e.key !== 'k')) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
       if (document.querySelector('dialog[open]')) return;
-      const at = items.findIndex((i) => i.docId === activeDocId);
-      const next = items[e.key === 'j' ? Math.min(at + 1, items.length - 1) : Math.max(at - 1, 0)];
-      if (next && next.docId !== activeDocId) {
-        router.push(hrefFor(next), { scroll: false });
-      }
+      step(e.key === 'j' ? 1 : -1);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, activeDocId, tab, viewTab, router]);
+
+  // ↑ / ↓ do the same once focus is in the list, and focus follows so the arrows keep working.
+  const onListKeyDown = (e: React.KeyboardEvent) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
+    if ((e.target as HTMLElement).tagName === 'SELECT') return;
+    e.preventDefault();
+    // Start from the row that has focus, which may not be the open one (Tab or a click can put it elsewhere).
+    const focused = (e.target as HTMLElement).closest<HTMLElement>('[data-docid]')?.dataset.docid ?? null;
+    const next = step(e.key === 'ArrowDown' ? 1 : -1, focused ?? cursor.current);
+    if (next) rowFor(next.docId)?.querySelector<HTMLElement>('a')?.focus();
+  };
 
   function hrefFor(item: QueueItem) {
     return urls.reviewDraft(item.docId, viewTab, tab);
@@ -139,6 +182,15 @@ export function QueueList({ groups, suggestions, tab, activeDocId, viewTab, canW
         })}
       </nav>
 
+      <QueueToolbar
+        filters={filters}
+        onChange={setFilters}
+        tags={facets.tags}
+        authors={facets.authors}
+        shown={items.length}
+        total={allItems.length}
+      />
+
       {bulk && eligible.length > 0 && (
         <label className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 text-xs text-gray-600">
           <input
@@ -156,7 +208,7 @@ export function QueueList({ groups, suggestions, tab, activeDocId, viewTab, canW
         </label>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={listRef} onKeyDown={onListKeyDown} className="min-h-0 flex-1 overflow-y-auto">
         {items.length ? (
           <ul className="divide-y divide-gray-100">
             {items.map((item) => (
@@ -175,6 +227,15 @@ export function QueueList({ groups, suggestions, tab, activeDocId, viewTab, canW
               />
             ))}
           </ul>
+        ) : filtered && allItems.length > 0 ? (
+          <div className="p-4">
+            <EmptyState icon="search" title="No matches">
+              Nothing in this list fits your search and filters.{' '}
+              <button type="button" onClick={() => setFilters({ ...NO_FILTERS, sort: filters.sort })} className="font-medium text-indigo-600 hover:underline">
+                Clear filters
+              </button>
+            </EmptyState>
+          </div>
         ) : (
           <div className="p-4">
             <EmptyState icon={EMPTY[tab].icon} title={EMPTY[tab].title}>
@@ -211,7 +272,7 @@ export function QueueList({ groups, suggestions, tab, activeDocId, viewTab, canW
         <BulkBar selected={selected} pending={pending} onClear={() => setSelectedIds(new Set())} onApprove={approveSelected} />
       ) : null}
       <p className="hidden border-t border-gray-100 px-3 py-1.5 text-[11px] text-gray-400 lg:block">
-        <kbd className="font-sans font-semibold">J</kbd> / <kbd className="font-sans font-semibold">K</kbd> next / previous
+        <kbd className="font-sans font-semibold">J</kbd> / <kbd className="font-sans font-semibold">K</kbd> or <kbd className="font-sans font-semibold">↑</kbd> / <kbd className="font-sans font-semibold">↓</kbd> next / previous
       </p>
     </>
   );

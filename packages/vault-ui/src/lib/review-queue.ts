@@ -9,6 +9,7 @@ export const QUEUE_TABS: readonly QueueTab[] = ['review', 'changes', 'drafts', '
 export interface QueueItem {
   docId: string;
   title: string;
+  tags: string[];
   status: DraftStatus;
   author: string;
   otherContributors: number;
@@ -38,6 +39,7 @@ function toItem(draft: DraftSummary, published: Map<string, { version: number | 
   return {
     docId: draft.docId,
     title: draft.title || draft.docId,
+    tags: draft.tags,
     status: draft.status,
     author: draft.author,
     otherContributors: draft.contributors.filter((c) => c !== draft.author).length,

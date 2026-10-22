@@ -1,7 +1,6 @@
 'use client';
 
 import type { EditorFields } from '../../lib/types';
-import { Icon } from '../Icon';
 import { FIELD_INPUT, FIELD_LABEL } from '../field-styles';
 import type { TagCount } from '../../lib/tags';
 import { PathField } from './PathField';
@@ -86,7 +85,7 @@ export function MetaFields(props: Props) {
                 value={fields.type}
                 onChange={(e) => onChange('type', e.target.value)}
                 disabled={disabled}
-                className={`${FIELD_INPUT} appearance-none pr-9`}
+                className={`${FIELD_INPUT} pr-9`}
               >
                 {TYPES.map((t) => (
                   <option key={t.value} value={t.value}>
@@ -94,10 +93,6 @@ export function MetaFields(props: Props) {
                   </option>
                 ))}
               </select>
-              <Icon
-                name="chevronDown"
-                className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-              />
             </div>
           </div>
         ) : null}

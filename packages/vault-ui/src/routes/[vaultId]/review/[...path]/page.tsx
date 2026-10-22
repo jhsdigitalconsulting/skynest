@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getDraft, readDocumentOrNull, staleReasonFor } from '../../../../review';
 import type { Draft } from '../../../../review';
 import { ActivityThread } from '../../../../components/ActivityThread';
+import { DraftNav } from '../../../../components/DraftNav';
 import { DiffView } from '../../../../components/DiffView';
 import { DraftPaneLayout } from '../../../../components/DraftPaneLayout';
 import { DocBreadcrumbs } from '../../../../components/DocBreadcrumbs';
@@ -128,6 +129,7 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
         </Link>
         <span className="text-gray-300 lg:hidden">/</span>
         <DocBreadcrumbs vaultId={vaultId} docId={docId} />
+        <DraftNav docId={docId} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">

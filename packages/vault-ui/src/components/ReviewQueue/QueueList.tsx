@@ -89,16 +89,21 @@ export function QueueList({ groups, suggestions, tab, activeDocId, viewTab, canW
     publishQueueOrder({ tab, ids: items.map((i) => i.docId) });
   }, [items, tab]);
 
-  // Keep the open row visible however it got selected (keys, links, or the pane's Previous / Next).
+  // Where the last key press landed. The URL (and so activeDocId) lags a beat behind, and a second press
+  // arriving before it catches up must continue from here, not from the stale open item.
+  const cursor = useRef<string | null>(activeDocId);
   useEffect(() => {
+    cursor.current = activeDocId;
+    // Keep the open row visible however it got selected (keys, links, or the pane's Previous / Next).
     if (activeDocId) rowFor(activeDocId)?.scrollIntoView({ block: 'nearest' });
   }, [activeDocId]);
 
-  // Open the item `delta` rows from the current one. With nothing open yet, j / ↓ opens the first.
-  const step = (delta: 1 | -1) => {
-    const at = items.findIndex((i) => i.docId === activeDocId);
+  // Open the item `delta` rows from the cursor. With nothing open yet, j / ↓ opens the first.
+  const step = (delta: 1 | -1, from: string | null = cursor.current) => {
+    const at = items.findIndex((i) => i.docId === from);
     const next = items[at === -1 ? 0 : Math.min(Math.max(at + delta, 0), items.length - 1)];
-    if (!next || next.docId === activeDocId) return;
+    if (!next || next.docId === from) return null;
+    cursor.current = next.docId;
     router.push(hrefFor(next), { scroll: false });
     return next;
   };
@@ -122,7 +127,9 @@ export function QueueList({ groups, suggestions, tab, activeDocId, viewTab, canW
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
     if ((e.target as HTMLElement).tagName === 'SELECT') return;
     e.preventDefault();
-    const next = step(e.key === 'ArrowDown' ? 1 : -1);
+    // Start from the row that has focus, which may not be the open one (Tab or a click can put it elsewhere).
+    const focused = (e.target as HTMLElement).closest<HTMLElement>('[data-docid]')?.dataset.docid ?? null;
+    const next = step(e.key === 'ArrowDown' ? 1 : -1, focused ?? cursor.current);
     if (next) rowFor(next.docId)?.querySelector<HTMLElement>('a')?.focus();
   };
 

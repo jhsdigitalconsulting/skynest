@@ -16,17 +16,7 @@ interface Props {
 }
 
 const SELECT =
-  'h-8 appearance-none rounded-md bg-white pl-2.5 pr-8 text-xs font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500';
-
-/** A native select with our own caret, so there's room to its right instead of the browser's cramped one. */
-function SelectBox({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="relative inline-flex">
-      {children}
-      <Icon name="chevronDown" className="pointer-events-none absolute right-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-500" />
-    </span>
-  );
-}
+  'h-8 rounded-md bg-white pl-2.5 text-xs font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500';
 
 /** Search box, filters and sort for the review list. */
 export function QueueToolbar({ filters, onChange, tags, authors, shown, total }: Props) {
@@ -66,34 +56,30 @@ export function QueueToolbar({ filters, onChange, tags, authors, shown, total }:
       <div className="flex flex-wrap items-center gap-1.5">
         <FilterMenu label="Tags" options={tags} selected={filters.tags} onChange={(next) => set({ tags: next })} />
         <FilterMenu label="Author" options={authors} selected={filters.authors} onChange={(next) => set({ authors: next })} />
-        <SelectBox>
-          <select
-            value={filters.updated}
-            onChange={(e) => set({ updated: e.target.value as UpdatedRange })}
-            aria-label="Filter by updated date"
-            className={`${SELECT} ${filters.updated !== 'any' ? 'bg-indigo-50 text-indigo-700' : ''}`}
-          >
-            {UPDATED_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.value === 'any' ? 'Updated: any time' : o.label}
-              </option>
-            ))}
-          </select>
-        </SelectBox>
-        <SelectBox>
-          <select
-            value={filters.sort}
-            onChange={(e) => set({ sort: e.target.value as QueueSort })}
-            aria-label="Sort the review list"
-            className={SELECT}
-          >
-            {SORT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                Sort: {o.label}
-              </option>
-            ))}
-          </select>
-        </SelectBox>
+        <select
+          value={filters.updated}
+          onChange={(e) => set({ updated: e.target.value as UpdatedRange })}
+          aria-label="Filter by updated date"
+          className={`${SELECT} ${filters.updated !== 'any' ? 'bg-indigo-50 text-indigo-700' : ''}`}
+        >
+          {UPDATED_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.value === 'any' ? 'Updated: any time' : o.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filters.sort}
+          onChange={(e) => set({ sort: e.target.value as QueueSort })}
+          aria-label="Sort the review list"
+          className={SELECT}
+        >
+          {SORT_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              Sort: {o.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {(count > 0 || filters.sort !== 'default') && (

@@ -137,6 +137,22 @@ describe('renderSkill', () => {
     expect(r.content).toContain('# Context Layer Maintenance');
   });
 
+  it('omits the offline-snapshot banner for eve, which fetches the skill live', () => {
+    const r = renderSkill(skillDoc(), { harness: 'eve', ...BASE });
+    expect(r.content).not.toContain('Offline snapshot');
+    expect(r.content).not.toContain('get_skill');
+    expect(r.content.startsWith('# Context Layer Maintenance\n\n')).toBe(true);
+  });
+
+  it.each(['claude-code', 'cursor', 'codex', 'raw'] as const)(
+    'keeps the offline-snapshot banner for %s',
+    (harness) => {
+      const r = renderSkill(skillDoc(), { harness, ...BASE });
+      expect(r.content).toContain('Offline snapshot');
+      expect(r.content).toContain('mcp__ctx__get_skill({ path: "nodes/execution/skills/context-layer-maintenance" })');
+    },
+  );
+
   it('installs an eve skill under agent/skills', () => {
     const r = renderSkill(skillDoc(), { harness: 'eve', ...BASE, scope: 'project' });
     expect(r.relativePath).toBe('agent/skills/context-layer-maintenance.md');

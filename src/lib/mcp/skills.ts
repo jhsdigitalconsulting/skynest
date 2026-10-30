@@ -20,7 +20,7 @@ import type { Frontmatter, SkillMeta } from '@promptowl/contextnest-engine';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export const HARNESSES = ['claude-code', 'cursor', 'codex', 'raw'] as const;
+export const HARNESSES = ['claude-code', 'cursor', 'codex', 'raw', 'eve'] as const;
 export type Harness = (typeof HARNESSES)[number];
 
 export const INSTALL_SCOPES = ['project', 'user'] as const;
@@ -343,6 +343,13 @@ const HARNESS_FORMATS: Record<Harness, HarnessFormat> = {
       base: scope === 'user' ? 'home' : 'project_root',
     }),
     postInstall: 'No harness-specific step — this is the unwrapped skill content.',
+  },
+
+  eve: {
+    wrap: ({ body }) => body,
+    path: (name) => ({ relativePath: `agent/skills/${name}.md`, base: 'project_root' }),
+    postInstall:
+      'No file to install: an eve agent fetches this skill over the MCP at runtime with get_skill and registers it as a dynamic skill.',
   },
 };
 

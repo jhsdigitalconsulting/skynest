@@ -253,7 +253,10 @@ function loaderBody(
     .replace(/\n{3,}/g, '\n\n');
 }
 
-/** The full body: the node's own content, plus a staleness warning and refresh path. */
+/**
+ * The full body: the node's own content, plus a staleness warning and refresh
+ * path unless the harness fetches the skill live (`snapshotBanner: false`).
+ */
 function fullBody(
   doc: SkillSource,
   skill: SkillMeta,
@@ -267,14 +270,20 @@ function fullBody(
     nodePath: doc.id,
   }).trim();
 
+  const banner = HARNESS_FORMATS[opts.harness].snapshotBanner
+    ? [
+        `> **Offline snapshot** of \`${doc.id}\`${version ? ` at version ${version}` : ''}.`,
+        `> The vault node is the source of truth and this copy will drift from it.`,
+        `> Refresh with \`mcp__${alias}__get_skill({ path: "${doc.id}" })\` whenever the vault`,
+        '> is reachable, and prefer the fetched version over this one.',
+        '',
+      ]
+    : [];
+
   return [
     `# ${doc.frontmatter.title}`,
     '',
-    `> **Offline snapshot** of \`${doc.id}\`${version ? ` at version ${version}` : ''}.`,
-    `> The vault node is the source of truth and this copy will drift from it.`,
-    `> Refresh with \`mcp__${alias}__get_skill({ path: "${doc.id}" })\` whenever the vault`,
-    '> is reachable, and prefer the fetched version over this one.',
-    '',
+    ...banner,
     contextBlocks(skill, alias),
     '',
     '---',
@@ -297,6 +306,11 @@ interface HarnessFormat {
   wrap(args: { name: string; description: string; title: string; body: string }): string;
   path(name: string, scope: InstallScope): { relativePath: string; base: 'project_root' | 'home' };
   postInstall: string;
+  /**
+   * Prepend the "Offline snapshot" banner to a full body. False for harnesses
+   * that fetch the skill live at runtime, where it is never a stale copy.
+   */
+  snapshotBanner: boolean;
 }
 
 const HARNESS_FORMATS: Record<Harness, HarnessFormat> = {
@@ -310,6 +324,7 @@ const HARNESS_FORMATS: Record<Harness, HarnessFormat> = {
     }),
     postInstall:
       'Restart Claude Code (or start a new session) so the skill is picked up. Invoke it with /<name> or let the description match automatically.',
+    snapshotBanner: true,
   },
 
   cursor: {
@@ -322,6 +337,7 @@ const HARNESS_FORMATS: Record<Harness, HarnessFormat> = {
       base: scope === 'user' ? 'home' : 'project_root',
     }),
     postInstall: 'Reload the Cursor window so the rule is picked up.',
+    snapshotBanner: true,
   },
 
   codex: {
@@ -334,6 +350,7 @@ const HARNESS_FORMATS: Record<Harness, HarnessFormat> = {
     }),
     postInstall:
       'Restart Codex so the skill is picked up. If your Codex build has no skills directory, reference the file from AGENTS.md instead.',
+    snapshotBanner: true,
   },
 
   raw: {
@@ -343,6 +360,7 @@ const HARNESS_FORMATS: Record<Harness, HarnessFormat> = {
       base: scope === 'user' ? 'home' : 'project_root',
     }),
     postInstall: 'No harness-specific step — this is the unwrapped skill content.',
+    snapshotBanner: true,
   },
 
   eve: {
@@ -350,6 +368,7 @@ const HARNESS_FORMATS: Record<Harness, HarnessFormat> = {
     path: (name) => ({ relativePath: `agent/skills/${name}.md`, base: 'project_root' }),
     postInstall:
       'No file to install: an eve agent fetches this skill over the MCP at runtime with get_skill and registers it as a dynamic skill.',
+    snapshotBanner: false,
   },
 };
 

@@ -316,6 +316,35 @@ describe('registerTools', () => {
       expect(JSON.parse(result.content[0].text).error).toMatch(/not "skill"/);
     });
 
+    it('accepts the eve harness and returns the body with no frontmatter', async () => {
+      mockStorage.readDocument.mockResolvedValue(SKILL_DOC);
+      mockStorage.readConfig.mockResolvedValue({ name: 'Test Vault' });
+      const tools = await loadTools();
+
+      const result = (await tools.get('get_skill')!.handler(
+        { path: 'nodes/skills/vault-bootstrap', harness: 'eve', server_alias: 'ctx' },
+        makeCtx(),
+      )) as { content: { text: string }[] };
+      const data = JSON.parse(result.content[0].text);
+
+      expect(data.content.startsWith('---')).toBe(false);
+      expect(data.suggested_path).toBe('agent/skills/vault-bootstrap.md');
+    });
+
+    it('rejects an unknown harness', async () => {
+      mockStorage.readDocument.mockResolvedValue(SKILL_DOC);
+      mockStorage.readConfig.mockResolvedValue({ name: 'Test Vault' });
+      const tools = await loadTools();
+      const registered = tools.get('get_skill')!.schema as {
+        shape?: Record<string, { safeParse(v: unknown): { success: boolean } }>;
+        harness?: { safeParse(v: unknown): { success: boolean } };
+      };
+      const harness = (registered.shape ?? registered).harness!;
+
+      expect(harness.safeParse('eve').success).toBe(true);
+      expect(harness.safeParse('eve2').success).toBe(false);
+    });
+
     it('defaults to loader mode and emits a file that fetches the node at run time', async () => {
       mockStorage.readDocument.mockResolvedValue(SKILL_DOC);
       mockStorage.readConfig.mockResolvedValue({ name: 'Test Vault' });

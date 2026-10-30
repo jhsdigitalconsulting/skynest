@@ -3,7 +3,9 @@ import { notFound } from 'next/navigation';
 import { getDraft, readDocumentOrNull, staleReasonFor } from '../../../../review';
 import type { Draft } from '../../../../review';
 import { ActivityThread } from '../../../../components/ActivityThread';
+import { DraftNav } from '../../../../components/DraftNav';
 import { DiffView } from '../../../../components/DiffView';
+import { DraftPaneLayout } from '../../../../components/DraftPaneLayout';
 import { DocBreadcrumbs } from '../../../../components/DocBreadcrumbs';
 import { EmptyState } from '../../../../components/EmptyState';
 import { Icon } from '../../../../components/Icon';
@@ -127,6 +129,7 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
         </Link>
         <span className="text-gray-300 lg:hidden">/</span>
         <DocBreadcrumbs vaultId={vaultId} docId={docId} />
+        <DraftNav docId={docId} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -196,8 +199,14 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
         />
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0">
+      <DraftPaneLayout
+        side={
+          <>
+            <div className="hidden xl:block">{actions}</div>
+            <ActivityThread docId={docId} activity={draft.activity} canComment={canWrite} />
+          </>
+        }
+      >
           {active === 'changes' ? (
             <DiffView
               before={before}
@@ -217,12 +226,7 @@ export default async function ReviewDraftPage({ params, searchParams }: Props) {
               })()}
             </article>
           )}
-        </div>
-        <aside className="space-y-4 xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:self-start xl:overflow-y-auto">
-          <div className="hidden xl:block">{actions}</div>
-          <ActivityThread docId={docId} activity={draft.activity} canComment={canWrite} />
-        </aside>
-      </div>
+      </DraftPaneLayout>
     </div>
   );
 }

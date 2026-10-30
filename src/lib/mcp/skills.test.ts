@@ -130,6 +130,20 @@ describe('renderSkill', () => {
     expect(r.content.startsWith('---')).toBe(false);
     expect(r.content).toContain('# Context Layer Maintenance');
   });
+
+  it('emits the body unwrapped for the eve harness', () => {
+    const r = renderSkill(skillDoc(), { harness: 'eve', ...BASE });
+    expect(r.content.startsWith('---')).toBe(false);
+    expect(r.content).toContain('# Context Layer Maintenance');
+  });
+
+  it('installs an eve skill under agent/skills', () => {
+    const r = renderSkill(skillDoc(), { harness: 'eve', ...BASE, scope: 'project' });
+    expect(r.relativePath).toBe('agent/skills/context-layer-maintenance.md');
+    expect(r.base).toBe('project_root');
+    const m = buildInstallManifest(skillDoc(), { harness: 'eve', ...BASE, scope: 'project', mode: 'loader' });
+    expect(m.post_install).toContain('MCP');
+  });
 });
 
 describe('buildInstallManifest', () => {

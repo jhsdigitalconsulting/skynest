@@ -41,6 +41,8 @@ Thumbs.db
 !.claude/settings.json
 !.claude/hooks/
 !.claude/hooks/**
+!.claude/commands/
+!.claude/commands/**
 
 # Logs
 *.log
